@@ -1,6 +1,6 @@
 #!/bin/sh
 
-RAIDENV=v0.17.0
+RAIDENV=v0.18.0
 RAIDENBIN=raiden-$RAIDENV-linux.tar.gz
 
 echo "Fetching Onboarder Tool"
