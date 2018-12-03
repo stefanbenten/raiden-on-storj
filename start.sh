@@ -1,5 +1,5 @@
 #!/bin/bash
-./raiden-v0.17.0-linux \
+./raiden-v0.18.0-linux \
     --keystore-path keystore \
     --network-id kovan \
     --environment-type development \
