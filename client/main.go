@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/gorilla/mux"
@@ -17,6 +18,8 @@ import (
 
 const raidenEndpoint = "http://localhost:5001/api/1/"
 const tokenAddress = "0x396764f15ed1467883A9a5B7D42AcFb788CD1826"
+const keystorePath = "../keystore"
+const password = "superStr0ng"
 
 func sendRequest(method string, url string, message string, contenttype string) (err error) {
 	var jsonStr = []byte(message)
@@ -40,7 +43,16 @@ func sendRequest(method string, url string, message string, contenttype string) 
 
 func startRaidenBinary(path string) {
 	command := exec.Command(path)
-
+	command.Args = []string{
+		"--keystore-path ../keystore",
+		"--password-file password",
+		"--network-id kovan",
+		"--environment-type development",
+		"--gas-price 20000000000",
+		"--eth-rpc-endpoint http://home.stefan-benten.de:7701",
+		"--api-address 0.0.0.0:7709",
+		"--rpccorsdomain all",
+	}
 	// set var to get the output
 	var out bytes.Buffer
 
@@ -56,17 +68,23 @@ func startRaidenBinary(path string) {
 
 func createEthereumAddress(password string) (address string) {
 
-	ks := keystore.NewKeyStore("./wallets", keystore.StandardScryptN, keystore.StandardScryptP)
+	ks := keystore.NewKeyStore(keystorePath, keystore.StandardScryptN, keystore.StandardScryptP)
 	account, err := ks.NewAccount(password)
 	if err != nil {
 		log.Fatal(err)
 	}
+	passwordfile, err := os.Create(password)
+	if err != nil {
+		log.Println("Unable to create passwordfile")
+	}
+	passwordfile.Write([]byte(password))
+	passwordfile.Close()
 	return account.Address.Hex()
 }
 
 func loadEthereumAddress(password string) (address string, err error) {
 
-	files, err := ioutil.ReadDir("./wallets/")
+	files, err := ioutil.ReadDir(keystorePath)
 	if err != nil {
 		return "", err
 	}
@@ -74,14 +92,14 @@ func loadEthereumAddress(password string) (address string, err error) {
 		return "", errors.New("No Keystore Files found")
 	}
 
-	file := fmt.Sprintf("./wallets/%v", files[0].Name())
-	ks := keystore.NewKeyStore("./run", keystore.StandardScryptN, keystore.StandardScryptP)
+	file := filepath.Join(keystorePath, files[0].Name())
+	ks := keystore.NewKeyStore(os.TempDir(), keystore.StandardScryptN, keystore.StandardScryptP)
 	jsonBytes, err := ioutil.ReadFile(file)
 	if err != nil {
 		return "", err
 	}
-
-	account, err := ks.Import(jsonBytes, password, password)
+	pass, err := ioutil.ReadFile(file)
+	account, err := ks.Import(jsonBytes, string(pass), password)
 	if err != nil {
 		return "", err
 	}
@@ -103,7 +121,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			//Fetch or Generate Ethereum address
-			password := "superstrong"
+
 			address, err := loadEthereumAddress(password)
 			if err != nil {
 				log.Println(err)
