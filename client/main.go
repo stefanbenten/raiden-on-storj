@@ -201,7 +201,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			//Start Raiden Binary
 			startRaidenBinary("./raiden-binary", ethAddress, ethnode)
 			//Wait for Endpoint to start up
-			time.Sleep(10 * time.Second)
+			time.Sleep(20 * time.Second)
 			//Send Request to Satellite for starting payments
 			err := sendRequest("GET", endpoint+ethAddress, "", "application/json")
 			if err != nil {

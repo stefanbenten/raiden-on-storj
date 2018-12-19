@@ -171,7 +171,9 @@ func setupChannel(receiver string, deposit int64) (channelID int, err error) {
 	log.Printf("Setting up Channel for %v with balance of %v", receiver, deposit)
 	message := fmt.Sprintf(`{"partner_address": "%v", "token_address": "%v", "total_deposit": %v, "settle_timeout": 500}`, receiver, tokenAddress, deposit)
 	err = sendRequest("PUT", "http://"+raidenEndpoint+"/api/v1/"+"channels", message, "application/json")
-	return
+
+	//TODO: Fetch correct Payment Channel
+	return 1, err
 }
 
 func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
@@ -201,6 +203,13 @@ func closeChanel(receiver string) (err error) {
 	return
 }
 
+func stopPayments(w http.ResponseWriter, r *http.Request) {
+	close(quit)
+	w.WriteHeader(200)
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte("Successfully stopped payments"))
+}
+
 func createRaidenEndpoint(ethNode string) {
 	ethAddress, err := loadEthereumAddress(password)
 	if err != nil {
@@ -210,12 +219,13 @@ func createRaidenEndpoint(ethNode string) {
 	log.Printf("Loaded Account: %v successfully", ethAddress)
 
 	startRaidenBinary("./raiden-binary", ethAddress, ethNode)
-	time.Sleep(10 * time.Second)
+	//Wait for Binary to start up
+	time.Sleep(20 * time.Second)
 }
 
 func setupWebserver(addr string) {
 	router := mux.NewRouter()
-	//router.HandleFunc("/", getStatus).Methods("GET")
+	router.HandleFunc("/stop", stopPayments).Methods("GET")
 	router.HandleFunc("/{paymentAddress}", handleChannelRequest).Methods("GET")
 	err := http.ListenAndServe(addr, router)
 	if err != nil {
