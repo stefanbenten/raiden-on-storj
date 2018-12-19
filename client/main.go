@@ -64,12 +64,18 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 		log.Println("Binary not found, fetching from Repo")
 		fetchRaidenBinary()
 	}
+
+	keyarg := fmt.Sprintf("--keystore-path %v", keystorePath)
+	passarg := fmt.Sprintf("--password-file %v", passwordFileName)
+	addarg := fmt.Sprintf("--address %v", address)
+	endarg := fmt.Sprintf("--eth-rpc-endpoint %v", ethEndpoint)
+
 	command := exec.Command(binarypath)
 	command.Args = []string{
-		fmt.Sprintf("--keystore-path %v", keystorePath),
-		fmt.Sprintf("--password-file %v", passwordFileName),
-		fmt.Sprintf("--address %v", address),
-		fmt.Sprintf("--eth-rpc-endpoint %v", ethEndpoint),
+		keyarg,
+		passarg,
+		addarg,
+		endarg,
 		"--network-id kovan",
 		"--environment-type development",
 		"--gas-price 20000000000",
