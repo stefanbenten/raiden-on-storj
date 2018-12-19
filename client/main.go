@@ -22,7 +22,7 @@ const keystorePath = "../keystore"
 const password = "superStr0ng"
 const passwordFileName = "password.txt"
 
-var ethAddress string
+var ethAddress string = ""
 
 func sendRequest(method string, url string, message string, contenttype string) (err error) {
 	var jsonStr = []byte(message)
@@ -128,7 +128,6 @@ func loadEthereumAddress(password string) (address string, err error) {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-
 	switch r.Method {
 	case "GET":
 		{
@@ -139,9 +138,10 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			}
 			//Fetch or Generate Ethereum address
 
-			ethAddress, err := loadEthereumAddress(password)
+			ethAddress, err = loadEthereumAddress(password)
 			if err != nil {
 				log.Println(err)
+				log.Println("Generating new Address..")
 				ethAddress = createEthereumAddress(password)
 			}
 			//Create Website Data
