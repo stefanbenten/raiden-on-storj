@@ -44,8 +44,7 @@ func sendRequest(method string, url string, message string, contenttype string) 
 }
 
 func fetchRaidenBinary() {
-	command := exec.Command("../install.sh")
-
+	command := exec.Command("sh ../install.sh")
 	var out bytes.Buffer
 	command.Stdout = &out
 
@@ -78,13 +77,14 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 		"--rpccorsdomain all",
 		"--accept-disclaimer",
 	}
+	log.Printf("Starting Raiden Binary with arguments: %v", command.Args)
 
 	var out bytes.Buffer
 	command.Stdout = &out
 
 	err = command.Run()
 	if err != nil {
-		log.Println(err)
+		log.Printf("raiden binary error: %v", err)
 	}
 
 	log.Println(out.String())
