@@ -20,6 +20,9 @@ const raidenEndpoint = "http://localhost:5001/api/1/"
 const tokenAddress = "0x396764f15ed1467883A9a5B7D42AcFb788CD1826"
 const keystorePath = "../keystore"
 const password = "superStr0ng"
+const passwordFileName = "password.txt"
+
+var ethAddress string
 
 func sendRequest(method string, url string, message string, contenttype string) (err error) {
 	var jsonStr = []byte(message)
@@ -41,19 +44,21 @@ func sendRequest(method string, url string, message string, contenttype string) 
 	return
 }
 
-func startRaidenBinary(address, binarypath string) {
+func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
+	log.Printf("Starting Raiden Binary for Address: %v and endpoint: %v", address, ethEndpoint)
+
 	command := exec.Command(binarypath)
 	command.Args = []string{
-		"--keystore-path ../keystore",
-		"--password-file password",
+		"--accept-disclaimer",
+		fmt.Sprintf("--keystore-path %v", keystorePath),
+		fmt.Sprintf("--password-file %V", passwordFileName),
+		fmt.Sprintf("--address %v", address),
+		fmt.Sprintf("--eth-rpc-endpoint %v", ethEndpoint),
 		"--network-id kovan",
 		"--environment-type development",
 		"--gas-price 20000000000",
-		"--eth-rpc-endpoint http://home.stefan-benten.de:7701",
 		"--api-address 0.0.0.0:7709",
 		"--rpccorsdomain all",
-		"--accept-disclaimer",
-		fmt.Sprintf("--address %v", address),
 	}
 	// set var to get the output
 	var out bytes.Buffer
@@ -73,14 +78,21 @@ func createEthereumAddress(password string) (address string) {
 	ks := keystore.NewKeyStore(keystorePath, keystore.StandardScryptN, keystore.StandardScryptP)
 	account, err := ks.NewAccount(password)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
-	passwordfile, err := os.Create("password")
+	passwordfile, err := os.Create(passwordFileName)
 	if err != nil {
-		log.Println("Unable to create passwordfile")
+		log.Println("Unable to create password-file")
 	}
-	passwordfile.Write([]byte(password))
-	passwordfile.Close()
+	//Write Password to File for Raiden Usage
+	_, err = passwordfile.Write([]byte(password))
+	if err != nil {
+		log.Println(err)
+	}
+	err = passwordfile.Close()
+	if err != nil {
+		log.Println(err)
+	}
 	return account.Address.Hex()
 }
 
@@ -100,12 +112,15 @@ func loadEthereumAddress(password string) (address string, err error) {
 	if err != nil {
 		return "", err
 	}
-	pass, err := ioutil.ReadFile(file)
+	pass, err := ioutil.ReadFile(passwordFileName)
+	if err != nil {
+		return "", err
+	}
 	account, err := ks.Import(jsonBytes, string(pass), password)
 	if err != nil {
 		return "", err
 	}
-
+	//Remove temporary keystore file
 	if err := os.Remove(file); err != nil {
 		log.Fatal(err)
 	}
@@ -124,19 +139,17 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			}
 			//Fetch or Generate Ethereum address
 
-			address, err := loadEthereumAddress(password)
+			ethAddress, err := loadEthereumAddress(password)
 			if err != nil {
 				log.Println(err)
-				address = createEthereumAddress(password)
+				ethAddress = createEthereumAddress(password)
 			}
-			//Start Raiden Binary
-			startRaidenBinary(address, "./raiden-binary")
 			//Create Website Data
 			Data := struct {
 				EthereumAddress string
 				Password        string
 			}{
-				address,
+				ethAddress,
 				password,
 			}
 			//Show Website
@@ -148,7 +161,12 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	case "POST":
 		{
-
+			endpoint := r.FormValue("endpoint")
+			ethnode := r.FormValue("ethnode")
+			log.Println("got:", endpoint, ethnode)
+			//Start Raiden Binary
+			startRaidenBinary("./raiden-binary", ethAddress, ethnode)
+			sendRequest("GET", endpoint+ethAddress, "", "application/json")
 		}
 	}
 }
