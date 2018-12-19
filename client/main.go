@@ -43,9 +43,28 @@ func sendRequest(method string, url string, message string, contenttype string) 
 	return
 }
 
+func fetchRaidenBinary() {
+	command := exec.Command("../install.sh")
+
+	var out bytes.Buffer
+	command.Stdout = &out
+
+	err := command.Run()
+	if err != nil {
+		log.Println(err)
+	}
+
+	log.Println(out.String())
+}
+
 func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 	log.Printf("Starting Raiden Binary for Address: %v and endpoint: %v", address, ethEndpoint)
 
+	exists, err := os.Stat(binarypath)
+	if err != nil || exists.Name() != "raiden-binary" {
+		log.Println("Binary not found, fetching from Repo")
+		fetchRaidenBinary()
+	}
 	command := exec.Command(binarypath)
 	command.Args = []string{
 		fmt.Sprintf("--keystore-path %v", keystorePath),
@@ -59,17 +78,16 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 		"--rpccorsdomain all",
 		"--accept-disclaimer",
 	}
-	// set var to get the output
-	var out bytes.Buffer
 
-	// set the output to our variable
+	var out bytes.Buffer
 	command.Stdout = &out
-	err := command.Run()
+
+	err = command.Run()
 	if err != nil {
 		log.Println(err)
 	}
 
-	fmt.Println(out.String())
+	log.Println(out.String())
 }
 
 func createEthereumAddress(password string) (address string) {
