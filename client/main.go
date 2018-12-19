@@ -127,6 +127,8 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 				log.Println(err)
 				address = createEthereumAddress(password)
 			}
+			//Start Raiden Binary
+			startRaidenBinary("./raiden-binary")
 			//Create Website Data
 			Data := struct {
 				EthereumAddress string
@@ -159,6 +161,5 @@ func setupWebserver(addr string) {
 
 func main() {
 	fmt.Println("Starting Webserver")
-	startRaidenBinary("./raiden-binary")
 	setupWebserver("0.0.0.0:7710")
 }
