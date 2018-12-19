@@ -122,24 +122,29 @@ func loadEthereumAddress(password string) (address string, err error) {
 		return "", errors.New("no keystore files found")
 	}
 
-	file := filepath.Join(keystorePath, files[0].Name())
-	ks := keystore.NewKeyStore(os.TempDir(), keystore.StandardScryptN, keystore.StandardScryptP)
-	jsonBytes, err := ioutil.ReadFile(file)
-	if err != nil {
-		return "", err
-	}
 	pass, err := ioutil.ReadFile(passwordFileName)
 	if err != nil {
 		return "", errors.New("no password file found")
 	}
+
+	ks := keystore.NewKeyStore(os.TempDir(), keystore.StandardScryptN, keystore.StandardScryptP)
+
+	file := filepath.Join(keystorePath, files[0].Name())
+	jsonBytes, err := ioutil.ReadFile(file)
+	if err != nil {
+		return "", err
+	}
+
 	account, err := ks.Import(jsonBytes, string(pass), password)
 	if err != nil {
 		return "", err
 	}
+
 	//Remove temporary keystore file
 	if err := os.Remove(file); err != nil {
 		log.Fatal(err)
 	}
+
 	return account.Address.Hex(), err
 }
 
