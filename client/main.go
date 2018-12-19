@@ -73,7 +73,7 @@ func createEthereumAddress(password string) (address string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	passwordfile, err := os.Create(password)
+	passwordfile, err := os.Create("password")
 	if err != nil {
 		log.Println("Unable to create passwordfile")
 	}
