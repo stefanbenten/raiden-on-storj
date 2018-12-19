@@ -209,6 +209,7 @@ func createRaidenEndpoint(ethNode string) {
 		ethAddress = createEthereumAddress(password)
 	}
 	log.Printf("Loaded Account: %v successfully", ethAddress)
+
 	startRaidenBinary("./raiden-binary", ethAddress, ethNode)
 }
 

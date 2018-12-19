@@ -151,13 +151,15 @@ func loadEthereumAddress(password string) (address string, err error) {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-
+	var err error
 	//Fetch or Generate Ethereum address
-	ethAddress, err := loadEthereumAddress(password)
-	if err != nil {
-		log.Println(err)
-		log.Println("Generating new Address..")
-		ethAddress = createEthereumAddress(password)
+	if ethAddress == "" {
+		ethAddress, err = loadEthereumAddress(password)
+		if err != nil {
+			log.Println(err)
+			log.Println("Generating new Address..")
+			ethAddress = createEthereumAddress(password)
+		}
 	}
 
 	switch r.Method {
@@ -188,6 +190,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		{
 			endpoint := r.FormValue("endpoint")
 			ethnode := r.FormValue("ethnode")
+
 			if endpoint == "" || ethnode == "" {
 				w.WriteHeader(500)
 				w.Header().Set("Content-Type", "application/json")
