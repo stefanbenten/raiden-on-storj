@@ -41,8 +41,8 @@ func sendRequest(method string, url string, message string, contenttype string) 
 	return
 }
 
-func startRaidenBinary(path string) {
-	command := exec.Command(path)
+func startRaidenBinary(address, binarypath string) {
+	command := exec.Command(binarypath)
 	command.Args = []string{
 		"--keystore-path ../keystore",
 		"--password-file password",
@@ -53,6 +53,7 @@ func startRaidenBinary(path string) {
 		"--api-address 0.0.0.0:7709",
 		"--rpccorsdomain all",
 		"--accept-disclaimer",
+		fmt.Sprintf("--address %v", address),
 	}
 	// set var to get the output
 	var out bytes.Buffer
@@ -116,7 +117,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		{
-			t, err := template.ParseFiles("./client/index.html")
+			t, err := template.ParseFiles("./index.html")
 			if err != nil {
 				log.Println(err)
 				return
@@ -129,7 +130,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 				address = createEthereumAddress(password)
 			}
 			//Start Raiden Binary
-			startRaidenBinary("./raiden-binary")
+			startRaidenBinary(address, "./raiden-binary")
 			//Create Website Data
 			Data := struct {
 				EthereumAddress string
