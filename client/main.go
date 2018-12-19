@@ -167,6 +167,10 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			//Start Raiden Binary
 			startRaidenBinary("./raiden-binary", ethAddress, ethnode)
 			sendRequest("GET", endpoint+ethAddress, "", "application/json")
+
+			w.WriteHeader(200)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte("Successfully started Payment System"))
 		}
 	}
 }
@@ -174,7 +178,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 func setupWebserver(addr string) {
 	router := mux.NewRouter()
 	//router.HandleFunc("/", getStatus).Methods("GET")
-	router.HandleFunc("/", handleIndex).Methods("GET")
+	router.HandleFunc("/", handleIndex).Methods("GET", "POST")
 
 	http.ListenAndServe(addr, router)
 }
