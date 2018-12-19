@@ -16,13 +16,12 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const raidenEndpoint = "http://localhost:5001/api/1/"
-const tokenAddress = "0x396764f15ed1467883A9a5B7D42AcFb788CD1826"
-const keystorePath = "../keystore"
+//const tokenAddress = "0x396764f15ed1467883A9a5B7D42AcFb788CD1826"
+const keystorePath = "./keystore"
 const password = "superStr0ng"
 const passwordFileName = "password.txt"
 
-var ethAddress string = ""
+var ethAddress = ""
 
 func sendRequest(method string, url string, message string, contenttype string) (err error) {
 	var jsonStr = []byte(message)
@@ -49,9 +48,8 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 
 	command := exec.Command(binarypath)
 	command.Args = []string{
-		"--accept-disclaimer",
 		fmt.Sprintf("--keystore-path %v", keystorePath),
-		fmt.Sprintf("--password-file %V", passwordFileName),
+		fmt.Sprintf("--password-file %v", passwordFileName),
 		fmt.Sprintf("--address %v", address),
 		fmt.Sprintf("--eth-rpc-endpoint %v", ethEndpoint),
 		"--network-id kovan",
@@ -59,6 +57,7 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 		"--gas-price 20000000000",
 		"--api-address 0.0.0.0:7709",
 		"--rpccorsdomain all",
+		"--accept-disclaimer",
 	}
 	// set var to get the output
 	var out bytes.Buffer
@@ -103,7 +102,7 @@ func loadEthereumAddress(password string) (address string, err error) {
 		return "", err
 	}
 	if len(files) == 0 {
-		return "", errors.New("No Keystore Files found")
+		return "", errors.New("no keystore files found")
 	}
 
 	file := filepath.Join(keystorePath, files[0].Name())
@@ -114,7 +113,7 @@ func loadEthereumAddress(password string) (address string, err error) {
 	}
 	pass, err := ioutil.ReadFile(passwordFileName)
 	if err != nil {
-		return "", err
+		return "", errors.New("no password file found")
 	}
 	account, err := ks.Import(jsonBytes, string(pass), password)
 	if err != nil {
@@ -166,11 +165,18 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			log.Println("got:", endpoint, ethnode)
 			//Start Raiden Binary
 			startRaidenBinary("./raiden-binary", ethAddress, ethnode)
-			sendRequest("GET", endpoint+ethAddress, "", "application/json")
 
+			//Send Request to Satellite for starting payments
+			err := sendRequest("GET", endpoint+ethAddress, "", "application/json")
+			if err != nil {
+				w.WriteHeader(500)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte("Issue started payment system, please check the log files"))
+				return
+			}
 			w.WriteHeader(200)
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte("Successfully started Payment System"))
+			_, _ = w.Write([]byte("Successfully started payment system"))
 		}
 	}
 }
@@ -180,7 +186,10 @@ func setupWebserver(addr string) {
 	//router.HandleFunc("/", getStatus).Methods("GET")
 	router.HandleFunc("/", handleIndex).Methods("GET", "POST")
 
-	http.ListenAndServe(addr, router)
+	err := http.ListenAndServe(addr, router)
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
 
 func main() {

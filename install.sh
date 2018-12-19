@@ -1,13 +1,10 @@
 #!/bin/sh
 
-RAIDENV=v0.18.0
-RAIDENBIN=raiden-$RAIDENV-linux.tar.gz
+RAIDENV=v0.19.0
+RAIDENBIN=raiden-$RAIDENV-linux
 
-echo "Fetching Onboarder Tool"
-curl -O https://raiden-nightlies.ams3.digitaloceanspaces.com/onboarder-linux.tar.gz
-tar -xzvf onboarder-linux.tar.gz
-rm onboarder-linux.tar.gz
 echo "Fetching Raiden $RAIDENV"
-curl -O https://raiden-nightlies.ams3.digitaloceanspaces.com/$RAIDENBIN
-tar -xzvf $RAIDENBIN
-rm $RAIDENBIN
+curl -O https://raiden-nightlies.ams3.digitaloceanspaces.com/$RAIDENBIN.tar.gz
+tar -xzvf $RAIDENBIN.tar.gz
+rm $RAIDENBIN.tar.gz
+mv $RAIDENBIN raiden-binary
