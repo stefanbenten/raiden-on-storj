@@ -11,19 +11,22 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/gorilla/mux"
 )
 
-const raidenEndpoint = "http://localhost:5001/api/1/"
-const tokenAddress = "faf"
-const keystorePath = "../keystore"
+const raidenEndpoint = "0.0.0.0:7709"
+const tokenAddress = "0x396764f15ed1467883A9a5B7D42AcFb788CD1826"
+const keystorePath = "./keystore"
 const password = "superStr0ng"
-const passwordFileName = "password.txt"
+const passwordFile = "password.txt"
 
 var channels map[string]int
 var ethAddress string
+var ticker *time.Ticker
+var quit chan struct{}
 
 func sendRequest(method string, url string, message string, contenttype string) (err error) {
 	var jsonStr = []byte(message)
@@ -45,28 +48,47 @@ func sendRequest(method string, url string, message string, contenttype string) 
 	return
 }
 
+func fetchRaidenBinary() {
+	command := exec.Command("sh", "../install.sh")
+	var out bytes.Buffer
+	command.Stdout = &out
+	//Start command and wait for the result
+	err := command.Run()
+	if err != nil {
+		log.Println(err)
+	}
+
+	log.Println(out.String())
+}
+
 func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 	log.Printf("Starting Raiden Binary for Address: %v and endpoint: %v", address, ethEndpoint)
+
+	exists, err := os.Stat(binarypath)
+	if err != nil || exists.Name() != "raiden-binary" {
+		log.Println("Binary not found, fetching from Repo")
+		fetchRaidenBinary()
+	}
 
 	command := exec.Command(binarypath)
 	command.Args = []string{
 		"--accept-disclaimer",
-		fmt.Sprintf("--keystore-path %v", keystorePath),
-		fmt.Sprintf("--password-file %V", passwordFileName),
-		fmt.Sprintf("--address %v", address),
-		fmt.Sprintf("--eth-rpc-endpoint %v", ethEndpoint),
-		"--network-id kovan",
-		"--environment-type development",
-		"--gas-price 20000000000",
-		"--api-address 0.0.0.0:7709",
-		"--rpccorsdomain all",
+		"--keystore-path", keystorePath,
+		"--password-file", passwordFile,
+		"--address", address,
+		"--eth-rpc-endpoint", ethEndpoint,
+		"--network-id", "kovan",
+		"--environment-type", "development",
+		"--gas-price", "20000000000",
+		"--api-address", raidenEndpoint,
+		"--rpccorsdomain", "all",
 	}
 	// set var to get the output
 	var out bytes.Buffer
 
 	// set the output to our variable
 	command.Stdout = &out
-	err := command.Run()
+	err = command.Start()
 	if err != nil {
 		log.Println(err)
 	}
@@ -81,10 +103,11 @@ func createEthereumAddress(password string) (address string) {
 	if err != nil {
 		log.Println(err)
 	}
-	passwordfile, err := os.Create(passwordFileName)
+	passwordfile, err := os.Create(passwordFile)
 	if err != nil {
 		log.Println("Unable to create password-file")
 	}
+
 	//Write Password to File for Raiden Usage
 	_, err = passwordfile.Write([]byte(password))
 	if err != nil {
@@ -104,40 +127,51 @@ func loadEthereumAddress(password string) (address string, err error) {
 		return "", err
 	}
 	if len(files) == 0 {
-		return "", errors.New("No Keystore Files found")
+		return "", errors.New("no keystore files found")
 	}
-
-	file := filepath.Join(keystorePath, files[0].Name())
+	if len(files) > 1 {
+		log.Println("multiple keystore files found, using first one")
+	}
+	//Read Password file
+	pass, err := ioutil.ReadFile(passwordFile)
+	if err != nil {
+		return "", errors.New("no password file found")
+	}
+	//Create Keystore for the account
 	ks := keystore.NewKeyStore(os.TempDir(), keystore.StandardScryptN, keystore.StandardScryptP)
+
+	//Get Account
+	file := filepath.Join(keystorePath, files[0].Name())
 	jsonBytes, err := ioutil.ReadFile(file)
 	if err != nil {
 		return "", err
 	}
-	pass, err := ioutil.ReadFile(passwordFileName)
-	if err != nil {
-		return "", err
-	}
+	//Import keystone file into KeyStore
 	account, err := ks.Import(jsonBytes, string(pass), password)
 	if err != nil {
 		return "", err
-	}
-	//Remove temporary keystore file
-	if err := os.Remove(file); err != nil {
-		log.Fatal(err)
 	}
 	return account.Address.Hex(), err
 }
 
 func sendPayments(receiver string, amount int64) (err error) {
 	go func() {
-		err = sendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
+		for {
+			select {
+			case <-ticker.C:
+				err = sendRequest("POST", "http://"+raidenEndpoint+"api/v1/"+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
+			case <-quit:
+				ticker.Stop()
+				return
+			}
+		}
 	}()
 	return
 }
 
 func setupChannel(receiver string, deposit int64) (channelID int, err error) {
 	message := fmt.Sprintf(`{"partner_address": "%v", "token_address": "%v", "total_deposit": %v, "settle_timeout": 500}`, receiver, tokenAddress, deposit)
-	err = sendRequest("PUT", raidenEndpoint+"channels", message, "application/json")
+	err = sendRequest("PUT", "http://"+raidenEndpoint+"api/v1/"+"channels", message, "application/json")
 	return
 }
 
@@ -145,7 +179,7 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	address := params["paymentAddress"]
 	if channels[address] == 0 {
-		id, err := setupChannel(address, 50000)
+		id, err := setupChannel(address, 5000000000)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -174,6 +208,7 @@ func createRaidenEndpoint(ethNode string) {
 		log.Println(err)
 		ethAddress = createEthereumAddress(password)
 	}
+	log.Printf("Loaded Account: %v successfully", ethAddress)
 	startRaidenBinary("./raiden-binary", ethAddress, ethNode)
 }
 
@@ -191,4 +226,7 @@ func main() {
 	fmt.Println("Starting Webserver")
 	createRaidenEndpoint("http://home.stefan-benten.de:7701")
 	setupWebserver("0.0.0.0:7700")
+
+	ticker = time.NewTicker(5 * time.Second)
+	quit = make(chan struct{})
 }

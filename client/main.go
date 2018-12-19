@@ -16,10 +16,12 @@ import (
 	"github.com/gorilla/mux"
 )
 
+const raidenEndpoint = "0.0.0.0:7709"
+
 //const tokenAddress = "0x396764f15ed1467883A9a5B7D42AcFb788CD1826"
-const keystorePath = "./keystore"
+const keystorePath = "./keystore/"
 const password = "superStr0ng"
-const passwordFileName = "password.txt"
+const passwordFile = "password.txt"
 
 var ethAddress = ""
 
@@ -65,22 +67,17 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 		fetchRaidenBinary()
 	}
 
-	keyarg := fmt.Sprintf("--keystore-path %v", keystorePath)
-	passarg := fmt.Sprintf("--password-file %v", passwordFileName)
-	addarg := fmt.Sprintf("--address %v", address)
-	endarg := fmt.Sprintf("--eth-rpc-endpoint %v", ethEndpoint)
-
 	command := exec.Command(binarypath)
 	command.Args = []string{
-		keyarg,
-		passarg,
-		addarg,
-		endarg,
-		"--network-id kovan",
-		"--environment-type development",
-		"--gas-price 20000000000",
-		"--api-address 0.0.0.0:7709",
-		"--rpccorsdomain all",
+		"--keystore-path", keystorePath,
+		"--password-file", passwordFile,
+		"--address", ethAddress,
+		"--eth-rpc-endpoint", ethEndpoint,
+		"--network-id", "kovan",
+		"--environment-type", "development",
+		"--gas-price", "20000000000",
+		"--api-address", raidenEndpoint,
+		"--rpccorsdomain", "all",
 		"--accept-disclaimer",
 	}
 	log.Printf("Starting Raiden Binary with arguments: %v", command.Args)
@@ -102,10 +99,11 @@ func createEthereumAddress(password string) (address string) {
 	if err != nil {
 		log.Println(err)
 	}
-	passwordfile, err := os.Create(passwordFileName)
+	passwordfile, err := os.Create(passwordFile)
 	if err != nil {
 		log.Println("Unable to create password-file")
 	}
+
 	//Write Password to File for Raiden Usage
 	_, err = passwordfile.Write([]byte(password))
 	if err != nil {
@@ -127,34 +125,41 @@ func loadEthereumAddress(password string) (address string, err error) {
 	if len(files) == 0 {
 		return "", errors.New("no keystore files found")
 	}
-
-	pass, err := ioutil.ReadFile(passwordFileName)
+	if len(files) > 1 {
+		log.Println("multiple keystore files found, using first one")
+	}
+	//Read Password file
+	pass, err := ioutil.ReadFile(passwordFile)
 	if err != nil {
 		return "", errors.New("no password file found")
 	}
-
+	//Create Keystore for the account
 	ks := keystore.NewKeyStore(os.TempDir(), keystore.StandardScryptN, keystore.StandardScryptP)
 
+	//Get Account
 	file := filepath.Join(keystorePath, files[0].Name())
 	jsonBytes, err := ioutil.ReadFile(file)
 	if err != nil {
 		return "", err
 	}
-
+	//Import keystone file into KeyStore
 	account, err := ks.Import(jsonBytes, string(pass), password)
 	if err != nil {
 		return "", err
 	}
-
-	//Remove temporary keystore file
-	if err := os.Remove(file); err != nil {
-		log.Fatal(err)
-	}
-
 	return account.Address.Hex(), err
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
+
+	//Fetch or Generate Ethereum address
+	ethAddress, err := loadEthereumAddress(password)
+	if err != nil {
+		log.Println(err)
+		log.Println("Generating new Address..")
+		ethAddress = createEthereumAddress(password)
+	}
+
 	switch r.Method {
 	case "GET":
 		{
@@ -163,14 +168,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 				log.Println(err)
 				return
 			}
-			//Fetch or Generate Ethereum address
 
-			ethAddress, err = loadEthereumAddress(password)
-			if err != nil {
-				log.Println(err)
-				log.Println("Generating new Address..")
-				ethAddress = createEthereumAddress(password)
-			}
 			//Create Website Data
 			Data := struct {
 				EthereumAddress string
@@ -190,7 +188,13 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		{
 			endpoint := r.FormValue("endpoint")
 			ethnode := r.FormValue("ethnode")
-			log.Println("got:", endpoint, ethnode)
+			if endpoint == "" || ethnode == "" {
+				w.WriteHeader(500)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte("Not all parameters provided, please check your request"))
+				return
+			}
+
 			//Start Raiden Binary
 			startRaidenBinary("./raiden-binary", ethAddress, ethnode)
 
