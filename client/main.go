@@ -52,6 +52,7 @@ func startRaidenBinary(path string) {
 		"--eth-rpc-endpoint http://home.stefan-benten.de:7701",
 		"--api-address 0.0.0.0:7709",
 		"--rpccorsdomain all",
+		"--accept-disclaimer",
 	}
 	// set var to get the output
 	var out bytes.Buffer
