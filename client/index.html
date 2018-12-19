@@ -1,0 +1,17 @@
+<html>
+    <head>
+        <title>Storj Payment Demo</title>
+    </head>
+    <body>
+        <h2>Your ETH Address is: {{.EthereumAddress}}</h2>
+        <h3>used password: {{.Password}}</h3>
+        <form action="/" method="POST">
+            Satellite Payment Endpoint:<br>
+            <input name="endpoint" type="text" size=40 value="http://home.stefan-benten.de:7700"><br>
+            ETH Node Address:<br>
+            <input name="ethnode" type="text" size=40 value="http://home.stefan-benten.de:7701"><br>
+            <hr>
+            <input type="submit" value="Start Payments!" />
+        </form>
+    </body>
+</html>
