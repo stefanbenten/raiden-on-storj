@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/gorilla/mux"
@@ -55,7 +56,7 @@ func fetchRaidenBinary() {
 		log.Println(err)
 	}
 
-	log.Println(out.String())
+	log.Println("Fetched Raiden Binary successfully")
 }
 
 func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
@@ -67,8 +68,7 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 		fetchRaidenBinary()
 	}
 
-	command := exec.Command(binarypath)
-	command.Args = []string{
+	command := exec.Command(binarypath,
 		"--keystore-path", keystorePath,
 		"--password-file", passwordFile,
 		"--address", ethAddress,
@@ -79,7 +79,7 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 		"--api-address", raidenEndpoint,
 		"--rpccorsdomain", "all",
 		"--accept-disclaimer",
-	}
+	)
 	log.Printf("Starting Raiden Binary with arguments: %v", command.Args)
 
 	var out bytes.Buffer
@@ -89,7 +89,6 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 	if err != nil {
 		log.Printf("raiden binary error: %v", err)
 	}
-	log.Println(out.String())
 }
 
 func createEthereumAddress(password string) (address string) {
@@ -160,6 +159,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			log.Println("Generating new Address..")
 			ethAddress = createEthereumAddress(password)
 		}
+		log.Printf("Using Ethereum Address %v", ethAddress)
 	}
 
 	switch r.Method {
@@ -200,13 +200,14 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 			//Start Raiden Binary
 			startRaidenBinary("./raiden-binary", ethAddress, ethnode)
-
+			//Wait for Endpoint to start up
+			time.Sleep(10 * time.Second)
 			//Send Request to Satellite for starting payments
 			err := sendRequest("GET", endpoint+ethAddress, "", "application/json")
 			if err != nil {
 				w.WriteHeader(500)
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte("Issue started payment system, please check the log files"))
+				_, _ = w.Write([]byte("Issue starting payment system, please check the log files"))
 				return
 			}
 			w.WriteHeader(200)

@@ -58,7 +58,7 @@ func fetchRaidenBinary() {
 		log.Println(err)
 	}
 
-	log.Println(out.String())
+	log.Println("Successfully got Raiden Binary")
 }
 
 func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
@@ -70,8 +70,7 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 		fetchRaidenBinary()
 	}
 
-	command := exec.Command(binarypath)
-	command.Args = []string{
+	command := exec.Command(binarypath,
 		"--accept-disclaimer",
 		"--keystore-path", keystorePath,
 		"--password-file", passwordFile,
@@ -82,7 +81,7 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 		"--gas-price", "20000000000",
 		"--api-address", raidenEndpoint,
 		"--rpccorsdomain", "all",
-	}
+	)
 	// set var to get the output
 	var out bytes.Buffer
 
@@ -92,8 +91,6 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 	if err != nil {
 		log.Println(err)
 	}
-
-	fmt.Println(out.String())
 }
 
 func createEthereumAddress(password string) (address string) {
@@ -159,7 +156,8 @@ func sendPayments(receiver string, amount int64) (err error) {
 		for {
 			select {
 			case <-ticker.C:
-				err = sendRequest("POST", "http://"+raidenEndpoint+"api/v1/"+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
+				log.Printf("Sending Payment to %v", receiver)
+				err = sendRequest("POST", "http://"+raidenEndpoint+"/api/v1/"+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
 			case <-quit:
 				ticker.Stop()
 				return
@@ -170,8 +168,9 @@ func sendPayments(receiver string, amount int64) (err error) {
 }
 
 func setupChannel(receiver string, deposit int64) (channelID int, err error) {
+	log.Printf("Setting up Channel for %v with balance of %v", receiver, deposit)
 	message := fmt.Sprintf(`{"partner_address": "%v", "token_address": "%v", "total_deposit": %v, "settle_timeout": 500}`, receiver, tokenAddress, deposit)
-	err = sendRequest("PUT", "http://"+raidenEndpoint+"api/v1/"+"channels", message, "application/json")
+	err = sendRequest("PUT", "http://"+raidenEndpoint+"/api/v1/"+"channels", message, "application/json")
 	return
 }
 
@@ -211,6 +210,7 @@ func createRaidenEndpoint(ethNode string) {
 	log.Printf("Loaded Account: %v successfully", ethAddress)
 
 	startRaidenBinary("./raiden-binary", ethAddress, ethNode)
+	time.Sleep(10 * time.Second)
 }
 
 func setupWebserver(addr string) {
