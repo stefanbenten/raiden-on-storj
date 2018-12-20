@@ -2,19 +2,16 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/gorilla/mux"
+	"raiden-on-storj/lib"
 )
 
 const raidenEndpoint = "0.0.0.0:7709"
@@ -25,26 +22,6 @@ const password = "superStr0ng"
 const passwordFile = "password.txt"
 
 var ethAddress = ""
-
-func sendRequest(method string, url string, message string, contenttype string) (err error) {
-	var jsonStr = []byte(message)
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(jsonStr))
-	req.Header.Set("Content-Type", contenttype)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer resp.Body.Close()
-
-	fmt.Println("Response Status:", resp.Status)
-	fmt.Println("Response Headers:", resp.Header)
-	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("Response Body:", string(body))
-	return
-}
 
 func fetchRaidenBinary() {
 	command := exec.Command("sh", "../install.sh")
@@ -91,73 +68,15 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 	}
 }
 
-func createEthereumAddress(password string) (address string) {
-
-	ks := keystore.NewKeyStore(keystorePath, keystore.StandardScryptN, keystore.StandardScryptP)
-	account, err := ks.NewAccount(password)
-	if err != nil {
-		log.Println(err)
-	}
-	passwordfile, err := os.Create(passwordFile)
-	if err != nil {
-		log.Println("Unable to create password-file")
-	}
-
-	//Write Password to File for Raiden Usage
-	_, err = passwordfile.Write([]byte(password))
-	if err != nil {
-		log.Println(err)
-	}
-	err = passwordfile.Close()
-	if err != nil {
-		log.Println(err)
-	}
-	return account.Address.Hex()
-}
-
-func loadEthereumAddress(password string) (address string, err error) {
-
-	files, err := ioutil.ReadDir(keystorePath)
-	if err != nil {
-		return "", err
-	}
-	if len(files) == 0 {
-		return "", errors.New("no keystore files found")
-	}
-	if len(files) > 1 {
-		log.Println("multiple keystore files found, using first one")
-	}
-	//Read Password file
-	pass, err := ioutil.ReadFile(passwordFile)
-	if err != nil {
-		return "", errors.New("no password file found")
-	}
-	//Create Keystore for the account
-	ks := keystore.NewKeyStore(os.TempDir(), keystore.StandardScryptN, keystore.StandardScryptP)
-
-	//Get Account
-	file := filepath.Join(keystorePath, files[0].Name())
-	jsonBytes, err := ioutil.ReadFile(file)
-	if err != nil {
-		return "", err
-	}
-	//Import keystone file into KeyStore
-	account, err := ks.Import(jsonBytes, string(pass), password)
-	if err != nil {
-		return "", err
-	}
-	return account.Address.Hex(), err
-}
-
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	var err error
 	//Fetch or Generate Ethereum address
 	if ethAddress == "" {
-		ethAddress, err = loadEthereumAddress(password)
+		ethAddress, err = lib.LoadEthereumAddress(keystorePath, password, passwordFile)
 		if err != nil {
 			log.Println(err)
 			log.Println("Generating new Address..")
-			ethAddress = createEthereumAddress(password)
+			ethAddress = lib.CreateEthereumAddress(keystorePath, password, passwordFile)
 		}
 		log.Printf("Using Ethereum Address %v", ethAddress)
 	}
@@ -202,8 +121,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			startRaidenBinary("./raiden-binary", ethAddress, ethnode)
 			//Wait for Endpoint to start up
 			time.Sleep(20 * time.Second)
+
 			//Send Request to Satellite for starting payments
-			err := sendRequest("GET", endpoint+ethAddress, "", "application/json")
+			_, _, err := lib.SendRequest("GET", endpoint+ethAddress, "", "application/json")
 			if err != nil {
 				w.WriteHeader(500)
 				w.Header().Set("Content-Type", "application/json")

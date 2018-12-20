@@ -2,51 +2,30 @@ package main
 
 import (
 	"bytes"
-	"errors"
+	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
+	"strconv"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/gorilla/mux"
+	"raiden-on-storj/lib"
 )
 
-const raidenEndpoint = "0.0.0.0:7709"
+const raidenEndpoint = "http://127.0.0.1:7709/api/v1/"
 const tokenAddress = "0x396764f15ed1467883A9a5B7D42AcFb788CD1826"
 const keystorePath = "./keystore"
 const password = "superStr0ng"
 const passwordFile = "password.txt"
 
 var channels map[string]int
-var ethAddress string
 var ticker *time.Ticker
 var quit chan struct{}
-
-func sendRequest(method string, url string, message string, contenttype string) (err error) {
-	var jsonStr = []byte(message)
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(jsonStr))
-	req.Header.Set("Content-Type", contenttype)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer resp.Body.Close()
-
-	fmt.Println("Response Status:", resp.Status)
-	fmt.Println("Response Headers:", resp.Header)
-	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("Response Body:", string(body))
-	return
-}
 
 func fetchRaidenBinary() {
 	command := exec.Command("sh", "../install.sh")
@@ -70,6 +49,8 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 		fetchRaidenBinary()
 	}
 
+	u, _ := url.Parse(raidenEndpoint)
+
 	command := exec.Command(binarypath,
 		"--accept-disclaimer",
 		"--keystore-path", keystorePath,
@@ -79,7 +60,7 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 		"--network-id", "kovan",
 		"--environment-type", "development",
 		"--gas-price", "20000000000",
-		"--api-address", raidenEndpoint,
+		"--api-address", u.Host,
 		"--rpccorsdomain", "all",
 	)
 	// set var to get the output
@@ -93,71 +74,13 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 	}
 }
 
-func createEthereumAddress(password string) (address string) {
-
-	ks := keystore.NewKeyStore(keystorePath, keystore.StandardScryptN, keystore.StandardScryptP)
-	account, err := ks.NewAccount(password)
-	if err != nil {
-		log.Println(err)
-	}
-	passwordfile, err := os.Create(passwordFile)
-	if err != nil {
-		log.Println("Unable to create password-file")
-	}
-
-	//Write Password to File for Raiden Usage
-	_, err = passwordfile.Write([]byte(password))
-	if err != nil {
-		log.Println(err)
-	}
-	err = passwordfile.Close()
-	if err != nil {
-		log.Println(err)
-	}
-	return account.Address.Hex()
-}
-
-func loadEthereumAddress(password string) (address string, err error) {
-
-	files, err := ioutil.ReadDir(keystorePath)
-	if err != nil {
-		return "", err
-	}
-	if len(files) == 0 {
-		return "", errors.New("no keystore files found")
-	}
-	if len(files) > 1 {
-		log.Println("multiple keystore files found, using first one")
-	}
-	//Read Password file
-	pass, err := ioutil.ReadFile(passwordFile)
-	if err != nil {
-		return "", errors.New("no password file found")
-	}
-	//Create Keystore for the account
-	ks := keystore.NewKeyStore(os.TempDir(), keystore.StandardScryptN, keystore.StandardScryptP)
-
-	//Get Account
-	file := filepath.Join(keystorePath, files[0].Name())
-	jsonBytes, err := ioutil.ReadFile(file)
-	if err != nil {
-		return "", err
-	}
-	//Import keystone file into KeyStore
-	account, err := ks.Import(jsonBytes, string(pass), password)
-	if err != nil {
-		return "", err
-	}
-	return account.Address.Hex(), err
-}
-
 func sendPayments(receiver string, amount int64) (err error) {
 	go func() {
 		for {
 			select {
 			case <-ticker.C:
 				log.Printf("Sending Payment to %v", receiver)
-				err = sendRequest("POST", "http://"+raidenEndpoint+"/api/v1/"+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
+				_, _, err = lib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
 			case <-quit:
 				ticker.Stop()
 				return
@@ -168,12 +91,30 @@ func sendPayments(receiver string, amount int64) (err error) {
 }
 
 func setupChannel(receiver string, deposit int64) (channelID int, err error) {
-	log.Printf("Setting up Channel for %v with balance of %v", receiver, deposit)
-	message := fmt.Sprintf(`{"partner_address": "%v", "token_address": "%v", "total_deposit": %v, "settle_timeout": 500}`, receiver, tokenAddress, deposit)
-	err = sendRequest("PUT", "http://"+raidenEndpoint+"/api/v1/"+"channels", message, "application/json")
+	var jsonr map[string]string
 
-	//TODO: Fetch correct Payment Channel
-	return 1, err
+	log.Printf("Setting up Channel for %v with balance of %v", receiver, deposit)
+
+	message := fmt.Sprintf(`{
+			"partner_address": "%v", 
+			"token_address": "%v", 
+			"total_deposit": %v, 
+			"settle_timeout": 500}`,
+		receiver,
+		tokenAddress,
+		deposit,
+	)
+
+	status, body, err := lib.SendRequest("PUT", raidenEndpoint+"channels", message, "application/json")
+	if status == http.StatusCreated {
+		json.Unmarshal([]byte(body), jsonr)
+		if jsonr["partner_address"] == receiver {
+			log.Println("Channel setup successfully for %v with balance of %v", receiver, deposit)
+			channelID, err = strconv.Atoi(jsonr["channel_identifier"])
+			return
+		}
+	}
+	return 0, err
 }
 
 func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
@@ -191,6 +132,9 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			fmt.Println(err)
 		}
+		w.WriteHeader(200)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`"status":"Opened Channel successfully"`))
 		return
 	}
 	err := closeChanel(address)
@@ -211,10 +155,10 @@ func stopPayments(w http.ResponseWriter, r *http.Request) {
 }
 
 func createRaidenEndpoint(ethNode string) {
-	ethAddress, err := loadEthereumAddress(password)
+	ethAddress, err := lib.LoadEthereumAddress(keystorePath, password, passwordFile)
 	if err != nil {
 		log.Println(err)
-		ethAddress = createEthereumAddress(password)
+		ethAddress = lib.CreateEthereumAddress(keystorePath, password, passwordFile)
 	}
 	log.Printf("Loaded Account: %v successfully", ethAddress)
 
