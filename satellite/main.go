@@ -24,7 +24,7 @@ const keystorePath = "./keystore"
 const password = "superStr0ng"
 const passwordFile = "password.txt"
 
-var channels = map[string]int{}
+var channels = map[string]int64{}
 var ticker *time.Ticker
 var quit chan struct{}
 
@@ -118,15 +118,15 @@ func getChannelInfo(receiver string) (info string, err error) {
 	return "", err*/
 }
 
-func setupChannel(receiver string, deposit int64) (channelID int, err error) {
+func setupChannel(receiver string, deposit int64) (channelID int64, err error) {
 	var jsonr map[string]interface{}
 
 	log.Printf("Setting up Channel for %v with balance of %v", receiver, deposit)
 
 	message := fmt.Sprintf(`{
-			"partner_address": "%v", 
-			"token_address": "%v", 
-			"total_deposit": %v, 
+			"partner_address": "%v",
+			"token_address": "%v",
+			"total_deposit": %v,
 			"settle_timeout": 500}`,
 		receiver,
 		tokenAddress,
@@ -139,7 +139,7 @@ func setupChannel(receiver string, deposit int64) (channelID int, err error) {
 		err = json.Unmarshal([]byte(body), &jsonr)
 		if jsonr["partner_address"] == receiver && err == nil {
 			log.Printf("Channel setup successfully for %v with balance of %v", receiver, deposit)
-			channelID = jsonr["channel_identifier"].(int)
+			channelID, err = jsonr["channel_identifier"].(int64)
 			return
 		}
 	}
@@ -202,7 +202,7 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 				err = json.Unmarshal([]byte(info), &jsonr)
 				log.Println(jsonr)
 				if jsonr["partner_address"] == address && err == nil {
-					id = jsonr["channel_identifier"].(int)
+					id, err = jsonr["channel_identifier"].(int64)
 				}
 			} else {
 				log.Println(err)
