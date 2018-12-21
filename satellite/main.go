@@ -88,7 +88,7 @@ func sendPayments(receiver string, amount int64) (err error) {
 				}
 				if statuscode == http.StatusPaymentRequired {
 					var jsonr map[string]string
-					err = json.Unmarshal([]byte(body), jsonr)
+					err = json.Unmarshal([]byte(body), &jsonr)
 					if err != nil {
 						return
 					}
@@ -137,7 +137,7 @@ func setupChannel(receiver string, deposit int64) (channelID int, err error) {
 	status, body, err := raidenlib.SendRequest("PUT", raidenEndpoint+"channels", message, "application/json")
 	log.Println(status, body)
 	if status == http.StatusCreated {
-		err = json.Unmarshal([]byte(body), jsonr)
+		err = json.Unmarshal([]byte(body), &jsonr)
 		if jsonr["partner_address"] == receiver && err == nil {
 			log.Printf("Channel setup successfully for %v with balance of %v", receiver, deposit)
 			channelID, err = strconv.Atoi(jsonr["channel_identifier"])
@@ -155,7 +155,7 @@ func raiseChannelFunds(receiver string, total_deposit int64) (err error) {
 	message := fmt.Sprintf(`{"total_deposit": "%v"}`, total_deposit)
 	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
 	if status == http.StatusOK {
-		err = json.Unmarshal([]byte(body), jsonr)
+		err = json.Unmarshal([]byte(body), &jsonr)
 		if jsonr["partner_address"] != receiver && err == nil {
 
 		}
@@ -168,7 +168,7 @@ func closeChannel(receiver string) (err error) {
 	message := `{"state": "closed"}`
 	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
 	if status == http.StatusOK {
-		err = json.Unmarshal([]byte(body), jsonr)
+		err = json.Unmarshal([]byte(body), &jsonr)
 		if err != nil && jsonr["state"] != "closed" && jsonr["partner_address"] == receiver {
 			return errors.New("unable to close channel! Please check the Raiden log files")
 		}
@@ -200,7 +200,7 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 			info, err := getChannelInfo(address)
 			if err == nil {
 				var jsonr map[string]string
-				err = json.Unmarshal([]byte(info), jsonr)
+				err = json.Unmarshal([]byte(info), &jsonr)
 				log.Println(jsonr)
 				if jsonr["partner_address"] == address && err == nil {
 					id, err = strconv.Atoi(jsonr["channel_identifier"])
