@@ -16,7 +16,7 @@ import (
 
 const raidenEndpoint = "0.0.0.0:7709"
 
-//const tokenAddress = "0x396764f15ed1467883A9a5B7D42AcFb788CD1826"
+//const tokenAddress = "0xd762baF19084256262b3f9164a9183009A9001da"
 const keystorePath = "./keystore/"
 const password = "superStr0ng"
 const passwordFile = "password.txt"

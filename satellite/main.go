@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -18,7 +19,7 @@ import (
 )
 
 const raidenEndpoint = "http://127.0.0.1:7709/api/v1/"
-const tokenAddress = "0x396764f15ed1467883A9a5B7D42AcFb788CD1826"
+const tokenAddress = "0xd762baF19084256262b3f9164a9183009A9001da"
 const keystorePath = "./keystore"
 const password = "superStr0ng"
 const passwordFile = "password.txt"
@@ -107,8 +108,8 @@ func setupChannel(receiver string, deposit int64) (channelID int, err error) {
 
 	status, body, err := lib.SendRequest("PUT", raidenEndpoint+"channels", message, "application/json")
 	if status == http.StatusCreated {
-		json.Unmarshal([]byte(body), jsonr)
-		if jsonr["partner_address"] == receiver {
+		err = json.Unmarshal([]byte(body), jsonr)
+		if jsonr["partner_address"] == receiver && err == nil {
 			log.Println("Channel setup successfully for %v with balance of %v", receiver, deposit)
 			channelID, err = strconv.Atoi(jsonr["channel_identifier"])
 			return
@@ -134,16 +135,38 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(200)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`"status":"Opened Channel successfully"`))
+		_, _ = w.Write([]byte(`"status":"Opened Channel successfully"`))
 		return
 	}
-	err := closeChanel(address)
+	err := closeChannel(address)
 	if err != nil {
 		fmt.Println(err)
 	}
 }
 
-func closeChanel(receiver string) (err error) {
+func raiseChannelFunds(receiver string, total_deposit int64) (err error) {
+	var jsonr map[string]string
+	message := fmt.Sprintf(`{"total_deposit": "%v"}`, total_deposit)
+	status, body, err := lib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
+	if status == http.StatusOK {
+		err = json.Unmarshal([]byte(body), jsonr)
+		if jsonr["partner_address"] != receiver && err == nil {
+
+		}
+	}
+	return
+}
+
+func closeChannel(receiver string) (err error) {
+	var jsonr map[string]string
+	message := `{"state": "closed"}`
+	status, body, err := lib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
+	if status == http.StatusOK {
+		err = json.Unmarshal([]byte(body), jsonr)
+		if err != nil && jsonr["state"] != "closed" && jsonr["partner_address"] == receiver {
+			return errors.New("Unable to close Channel! Please check the Raiden Logs")
+		}
+	}
 	return
 }
 
