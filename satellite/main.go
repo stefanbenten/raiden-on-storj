@@ -105,7 +105,9 @@ func sendPayments(receiver string, amount int64) (err error) {
 }
 
 func getChannelInfo(receiver string) (info string, err error) {
+	log.Println(raidenEndpoint + path.Join("channels", tokenAddress))
 	status, body, err := raidenlib.SendRequest("GET", raidenEndpoint+path.Join("channels", tokenAddress, receiver), "", "application/json")
+	log.Println(body)
 	if status == http.StatusOK {
 		return body, nil
 	}
