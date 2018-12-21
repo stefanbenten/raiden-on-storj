@@ -232,7 +232,7 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleIndex(w http.ResponseWriter, r *http.Request) {
+func handleDebug(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		{
@@ -305,6 +305,6 @@ func main() {
 	createRaidenEndpoint("http://home.stefan-benten.de:7701")
 	setupWebserver("0.0.0.0:7700")
 
-	ticker = time.NewTicker(5 * time.Second).C
+	ticker = time.NewTicker(5 * time.Second)
 	quit = make(chan struct{})
 }
