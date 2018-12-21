@@ -110,13 +110,13 @@ func getChannelInfo(receiver string) (info string, err error) {
 	log.Println(raidenEndpoint + path.Join("channels", tokenAddress, receiver))
 	status, body, err := raidenlib.SendRequest("GET", raidenEndpoint+path.Join("channels", tokenAddress, receiver), "", "application/json")
 	log.Println(status, body)
-	if status == http.StatusOK {
-		return body, nil
-	}
+	//if status == http.StatusOK {
+	return body, nil
+	/*}
 	if err == nil {
 		err = errors.New(fmt.Sprintf("Query failed with Status %v", status))
 	}
-	return "", err
+	return "", err*/
 }
 
 func setupChannel(receiver string, deposit int64) (channelID int, err error) {
