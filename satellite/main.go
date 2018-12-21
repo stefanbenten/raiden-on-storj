@@ -104,6 +104,17 @@ func sendPayments(receiver string, amount int64) (err error) {
 	return
 }
 
+func getChannelInfo(receiver string) (info string, err error) {
+	status, body, err := raidenlib.SendRequest("GET", raidenEndpoint+path.Join("channels", tokenAddress, receiver), "", "application/json")
+	if status == http.StatusOK {
+		return body, nil
+	}
+	if err == nil {
+		err = errors.New(fmt.Sprintf("Query failed with Status %v", status))
+	}
+	return "", err
+}
+
 func setupChannel(receiver string, deposit int64) (channelID int, err error) {
 	var jsonr map[string]string
 
@@ -120,6 +131,7 @@ func setupChannel(receiver string, deposit int64) (channelID int, err error) {
 	)
 
 	status, body, err := raidenlib.SendRequest("PUT", raidenEndpoint+"channels", message, "application/json")
+	log.Println(status, body)
 	if status == http.StatusCreated {
 		err = json.Unmarshal([]byte(body), jsonr)
 		if jsonr["partner_address"] == receiver && err == nil {
@@ -127,6 +139,9 @@ func setupChannel(receiver string, deposit int64) (channelID int, err error) {
 			channelID, err = strconv.Atoi(jsonr["channel_identifier"])
 			return
 		}
+	}
+	if err == nil {
+		err = errors.New(body)
 	}
 	return 0, err
 }
@@ -137,9 +152,25 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 	if channels[address] == 0 {
 		log.Printf("No Channel with %v found, creating...", address)
 		id, err := setupChannel(address, 5000000000)
-		if err != nil {
+		if err != nil && err.Error() != `{"errors": "Channel with given partner address already exists"}` {
 			fmt.Println(err)
 			return
+		}
+		if id == 0 {
+			info, err := getChannelInfo(address)
+			if err != nil {
+				var jsonr map[string]string
+				err = json.Unmarshal([]byte(info), jsonr)
+				if jsonr["partner_address"] == address && err == nil {
+					id, err = strconv.Atoi(jsonr["channel_identifier"])
+					if err != nil {
+						w.WriteHeader(500)
+						w.Header().Set("Content-Type", "application/json")
+						_, _ = w.Write([]byte(`"error":"internal error getting channel information"`))
+						return
+					}
+				}
+			}
 		}
 		log.Printf("Channel with %v created, ID is %v", address, id)
 		channels[address] = id
