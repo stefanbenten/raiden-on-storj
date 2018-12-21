@@ -109,7 +109,7 @@ func sendPayments(receiver string, amount int64) (err error) {
 func getChannelInfo(receiver string) (info string, err error) {
 	log.Println(raidenEndpoint + path.Join("channels", tokenAddress, receiver))
 	status, body, err := raidenlib.SendRequest("GET", raidenEndpoint+path.Join("channels", tokenAddress, receiver), "", "application/json")
-	log.Println(body)
+	log.Println(status, body)
 	if status == http.StatusOK {
 		return body, nil
 	}
@@ -195,11 +195,10 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		if id == 0 {
 			info, err := getChannelInfo(address)
-			if err != nil {
+			if err == nil {
 				var jsonr map[string]string
-				log.Println(info)
-				return
 				err = json.Unmarshal([]byte(info), jsonr)
+				log.Println(jsonr)
 				if jsonr["partner_address"] == address && err == nil {
 					id, err = strconv.Atoi(jsonr["channel_identifier"])
 					if err != nil {
@@ -209,6 +208,9 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 				}
+			} else {
+				log.Println(err)
+				return
 			}
 		}
 		log.Printf("Channel with %v created, ID is %v", address, id)
