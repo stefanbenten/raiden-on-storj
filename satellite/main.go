@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -87,7 +86,7 @@ func sendPayments(receiver string, amount int64) (err error) {
 					return
 				}
 				if statuscode == http.StatusPaymentRequired {
-					var jsonr map[string]string
+					var jsonr map[string]interface{}
 					err = json.Unmarshal([]byte(body), &jsonr)
 					if err != nil {
 						return
@@ -120,7 +119,7 @@ func getChannelInfo(receiver string) (info string, err error) {
 }
 
 func setupChannel(receiver string, deposit int64) (channelID int, err error) {
-	var jsonr map[string]string
+	var jsonr map[string]interface{}
 
 	log.Printf("Setting up Channel for %v with balance of %v", receiver, deposit)
 
@@ -140,7 +139,7 @@ func setupChannel(receiver string, deposit int64) (channelID int, err error) {
 		err = json.Unmarshal([]byte(body), &jsonr)
 		if jsonr["partner_address"] == receiver && err == nil {
 			log.Printf("Channel setup successfully for %v with balance of %v", receiver, deposit)
-			channelID, err = strconv.Atoi(jsonr["channel_identifier"])
+			channelID = jsonr["channel_identifier"].(int)
 			return
 		}
 	}
@@ -151,7 +150,7 @@ func setupChannel(receiver string, deposit int64) (channelID int, err error) {
 }
 
 func raiseChannelFunds(receiver string, total_deposit int64) (err error) {
-	var jsonr map[string]string
+	var jsonr map[string]interface{}
 	message := fmt.Sprintf(`{"total_deposit": "%v"}`, total_deposit)
 	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
 	if status == http.StatusOK {
@@ -164,7 +163,7 @@ func raiseChannelFunds(receiver string, total_deposit int64) (err error) {
 }
 
 func closeChannel(receiver string) (err error) {
-	var jsonr map[string]string
+	var jsonr map[string]interface{}
 	message := `{"state": "closed"}`
 	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
 	if status == http.StatusOK {
@@ -199,11 +198,11 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		if id == 0 {
 			info, err := getChannelInfo(address)
 			if err == nil {
-				var jsonr map[string]string
+				var jsonr map[string]interface{}
 				err = json.Unmarshal([]byte(info), &jsonr)
 				log.Println(jsonr)
 				if jsonr["partner_address"] == address && err == nil {
-					id, err = strconv.Atoi(jsonr["channel_identifier"])
+					id, err = jsonr["channel_identifier"].(int)
 					if err != nil {
 						w.WriteHeader(500)
 						w.Header().Set("Content-Type", "application/json")
