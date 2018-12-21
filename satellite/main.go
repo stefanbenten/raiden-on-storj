@@ -160,6 +160,8 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 			info, err := getChannelInfo(address)
 			if err != nil {
 				var jsonr map[string]string
+				log.Println(info)
+				return
 				err = json.Unmarshal([]byte(info), jsonr)
 				if jsonr["partner_address"] == address && err == nil {
 					id, err = strconv.Atoi(jsonr["channel_identifier"])
