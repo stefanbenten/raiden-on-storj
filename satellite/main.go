@@ -186,6 +186,9 @@ func stopPayments(w http.ResponseWriter, r *http.Request) {
 func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	address := params["paymentAddress"]
+	if address == "" {
+		return
+	}
 	if channels[address] == 0 {
 		log.Printf("No Channel with %v found, creating...", address)
 		id, err := setupChannel(address, 5000000000)
@@ -292,7 +295,7 @@ func createRaidenEndpoint(ethNode string) {
 func setupWebserver(addr string) {
 	router := mux.NewRouter()
 	router.HandleFunc("/stop", stopPayments).Methods("GET")
-	router.HandleFunc("/{paymentAddress}", handleChannelRequest).Methods("GET")
+	router.HandleFunc("/start/{paymentAddress}", handleChannelRequest).Methods("GET")
 	router.HandleFunc("/debug", handleDebug).Methods("GET", "POST")
 	err := http.ListenAndServe(addr, router)
 	if err != nil {
