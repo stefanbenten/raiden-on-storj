@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"raiden-on-storj/raidenlib"
+	"github.com/stefanbenten/raiden-on-storj/raidenlib"
 )
 
 const raidenEndpoint = "0.0.0.0:7709"

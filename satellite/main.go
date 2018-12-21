@@ -15,16 +15,16 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"raiden-on-storj/raidenlib"
+	"github.com/stefanbenten/raiden-on-storj/raidenlib"
 )
 
-const raidenEndpoint = "http://127.0.0.1:7709/api/v1/"
+const raidenEndpoint = "http://0.0.0.0:7709/api/v1/"
 const tokenAddress = "0xd762baF19084256262b3f9164a9183009A9001da"
 const keystorePath = "./keystore"
 const password = "superStr0ng"
 const passwordFile = "password.txt"
 
-var channels map[string]int
+var channels = map[string]int{}
 var ticker *time.Ticker
 var quit chan struct{}
 
@@ -93,7 +93,7 @@ func sendPayments(receiver string, amount int64) (err error) {
 					}
 					log.Println(body)
 					//log.Printf("Channel Balance of ID %v insufficient (is: %v, need: %v), refunding..", channels[receiver], jsonr["balance"], amount)
-					raiseChannelFunds(receiver, 5000000000)
+					err = raiseChannelFunds(receiver, 5000000000)
 				}
 			case <-quit:
 				ticker.Stop()
