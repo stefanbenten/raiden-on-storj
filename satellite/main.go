@@ -202,13 +202,7 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 				err = json.Unmarshal([]byte(info), &jsonr)
 				log.Println(jsonr)
 				if jsonr["partner_address"] == address && err == nil {
-					id, err = jsonr["channel_identifier"].(int)
-					if err != nil {
-						w.WriteHeader(500)
-						w.Header().Set("Content-Type", "application/json")
-						_, _ = w.Write([]byte(`"error":"internal error getting channel information"`))
-						return
-					}
+					id = jsonr["channel_identifier"].(int)
 				}
 			} else {
 				log.Println(err)
