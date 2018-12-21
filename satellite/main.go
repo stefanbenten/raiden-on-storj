@@ -135,11 +135,13 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	address := params["paymentAddress"]
 	if channels[address] == 0 {
+		log.Printf("No Channel with %v found, creating...", address)
 		id, err := setupChannel(address, 5000000000)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
+		log.Printf("Channel with %v created, ID is %v", address, id)
 		channels[address] = id
 
 		err = sendPayments(address, 1337)
@@ -151,6 +153,7 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`"status":"Opened Channel successfully"`))
 		return
 	}
+	log.Printf("Found Channel with ID %v, closing...", channels[address])
 	err := closeChannel(address)
 	if err != nil {
 		fmt.Println(err)
