@@ -81,7 +81,20 @@ func sendPayments(receiver string, amount int64) (err error) {
 			select {
 			case <-ticker.C:
 				log.Printf("Sending Payment to %v", receiver)
-				_, _, err = raidenlib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
+				statuscode, body, err := raidenlib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
+				if err != nil {
+					return
+				}
+				if statuscode == http.StatusPaymentRequired {
+					var jsonr map[string]string
+					err = json.Unmarshal([]byte(body), jsonr)
+					if err != nil {
+						return
+					}
+					log.Println(body)
+					//log.Printf("Channel Balance of ID %v insufficient (is: %v, need: %v), refunding..", channels[receiver], jsonr["balance"], amount)
+					raiseChannelFunds(receiver, 5000000000)
+				}
 			case <-quit:
 				ticker.Stop()
 				return
@@ -110,7 +123,7 @@ func setupChannel(receiver string, deposit int64) (channelID int, err error) {
 	if status == http.StatusCreated {
 		err = json.Unmarshal([]byte(body), jsonr)
 		if jsonr["partner_address"] == receiver && err == nil {
-			log.Println("Channel setup successfully for %v with balance of %v", receiver, deposit)
+			log.Printf("Channel setup successfully for %v with balance of %v", receiver, deposit)
 			channelID, err = strconv.Atoi(jsonr["channel_identifier"])
 			return
 		}
@@ -164,7 +177,7 @@ func closeChannel(receiver string) (err error) {
 	if status == http.StatusOK {
 		err = json.Unmarshal([]byte(body), jsonr)
 		if err != nil && jsonr["state"] != "closed" && jsonr["partner_address"] == receiver {
-			return errors.New("Unable to close Channel! Please check the Raiden Logs")
+			return errors.New("unable to close channel! Please check the Raiden log files")
 		}
 	}
 	return
