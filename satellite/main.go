@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"net/url"
@@ -26,7 +27,7 @@ const passwordFile = "password.txt"
 
 var channels = map[string]int{}
 var ticker *time.Ticker
-var quit chan struct{}
+var quit <-chan struct{}
 
 func fetchRaidenBinary() {
 	command := exec.Command("sh", "../install.sh")
@@ -79,8 +80,8 @@ func sendPayments(receiver string, amount int64) (err error) {
 	go func() {
 		for {
 			select {
-			case <-ticker.C:
-				log.Printf("Sending Payment to %v", receiver)
+			case t := <-ticker.C:
+				log.Printf("Sending Payment to %v at: $v", receiver, t)
 				statuscode, body, err := raidenlib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
 				if err != nil {
 					return
@@ -97,6 +98,7 @@ func sendPayments(receiver string, amount int64) (err error) {
 				}
 			case <-quit:
 				ticker.Stop()
+				log.Printf("Stopped Payments to %v", receiver)
 				return
 			}
 		}
@@ -105,7 +107,7 @@ func sendPayments(receiver string, amount int64) (err error) {
 }
 
 func getChannelInfo(receiver string) (info string, err error) {
-	log.Println(raidenEndpoint + path.Join("channels", tokenAddress))
+	log.Println(raidenEndpoint + path.Join("channels", tokenAddress, receiver))
 	status, body, err := raidenlib.SendRequest("GET", raidenEndpoint+path.Join("channels", tokenAddress, receiver), "", "application/json")
 	log.Println(body)
 	if status == http.StatusOK {
@@ -146,6 +148,39 @@ func setupChannel(receiver string, deposit int64) (channelID int, err error) {
 		err = errors.New(body)
 	}
 	return 0, err
+}
+
+func raiseChannelFunds(receiver string, total_deposit int64) (err error) {
+	var jsonr map[string]string
+	message := fmt.Sprintf(`{"total_deposit": "%v"}`, total_deposit)
+	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
+	if status == http.StatusOK {
+		err = json.Unmarshal([]byte(body), jsonr)
+		if jsonr["partner_address"] != receiver && err == nil {
+
+		}
+	}
+	return
+}
+
+func closeChannel(receiver string) (err error) {
+	var jsonr map[string]string
+	message := `{"state": "closed"}`
+	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
+	if status == http.StatusOK {
+		err = json.Unmarshal([]byte(body), jsonr)
+		if err != nil && jsonr["state"] != "closed" && jsonr["partner_address"] == receiver {
+			return errors.New("unable to close channel! Please check the Raiden log files")
+		}
+	}
+	return
+}
+
+func stopPayments(w http.ResponseWriter, r *http.Request) {
+	close(quit)
+	w.WriteHeader(200)
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte("Successfully stopped payments"))
 }
 
 func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
@@ -195,37 +230,48 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func raiseChannelFunds(receiver string, total_deposit int64) (err error) {
-	var jsonr map[string]string
-	message := fmt.Sprintf(`{"total_deposit": "%v"}`, total_deposit)
-	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
-	if status == http.StatusOK {
-		err = json.Unmarshal([]byte(body), jsonr)
-		if jsonr["partner_address"] != receiver && err == nil {
+func handleIndex(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		{
+			t, err := template.ParseFiles("./index.html")
+			if err != nil {
+				log.Println(err)
+				return
+			}
 
+			//Create Website Data
+			Data := struct {
+				TokenAddress string
+			}{
+				tokenAddress,
+			}
+			//Show Website
+			err = t.Execute(w, Data)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+		}
+	case "POST":
+		{
+			method := r.FormValue("method")
+			endpoint := r.FormValue("endpoint")
+			body := r.FormValue("message")
+
+			//Send Request to Satellite for starting payments
+			status, body, err := raidenlib.SendRequest(method, endpoint, body, "application/json")
+			if err != nil {
+				w.WriteHeader(500)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte("Request failed"))
+				return
+			}
+			w.WriteHeader(200)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(fmt.Sprintf("Status: %v, Body: %v", status, body)))
 		}
 	}
-	return
-}
-
-func closeChannel(receiver string) (err error) {
-	var jsonr map[string]string
-	message := `{"state": "closed"}`
-	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
-	if status == http.StatusOK {
-		err = json.Unmarshal([]byte(body), jsonr)
-		if err != nil && jsonr["state"] != "closed" && jsonr["partner_address"] == receiver {
-			return errors.New("unable to close channel! Please check the Raiden log files")
-		}
-	}
-	return
-}
-
-func stopPayments(w http.ResponseWriter, r *http.Request) {
-	close(quit)
-	w.WriteHeader(200)
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte("Successfully stopped payments"))
 }
 
 func createRaidenEndpoint(ethNode string) {
@@ -245,6 +291,7 @@ func setupWebserver(addr string) {
 	router := mux.NewRouter()
 	router.HandleFunc("/stop", stopPayments).Methods("GET")
 	router.HandleFunc("/{paymentAddress}", handleChannelRequest).Methods("GET")
+	router.HandleFunc("/debug", handleDebug).Methods("GET", "POST")
 	err := http.ListenAndServe(addr, router)
 	if err != nil {
 		log.Fatalln(err)
@@ -256,6 +303,6 @@ func main() {
 	createRaidenEndpoint("http://home.stefan-benten.de:7701")
 	setupWebserver("0.0.0.0:7700")
 
-	ticker = time.NewTicker(5 * time.Second)
+	ticker = time.NewTicker(5 * time.Second).C
 	quit = make(chan struct{})
 }
