@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"raiden-on-storj/lib"
+	"raiden-on-storj/raidenlib"
 )
 
 const raidenEndpoint = "http://127.0.0.1:7709/api/v1/"
@@ -81,7 +81,7 @@ func sendPayments(receiver string, amount int64) (err error) {
 			select {
 			case <-ticker.C:
 				log.Printf("Sending Payment to %v", receiver)
-				_, _, err = lib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
+				_, _, err = raidenlib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
 			case <-quit:
 				ticker.Stop()
 				return
@@ -106,7 +106,7 @@ func setupChannel(receiver string, deposit int64) (channelID int, err error) {
 		deposit,
 	)
 
-	status, body, err := lib.SendRequest("PUT", raidenEndpoint+"channels", message, "application/json")
+	status, body, err := raidenlib.SendRequest("PUT", raidenEndpoint+"channels", message, "application/json")
 	if status == http.StatusCreated {
 		err = json.Unmarshal([]byte(body), jsonr)
 		if jsonr["partner_address"] == receiver && err == nil {
@@ -147,7 +147,7 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 func raiseChannelFunds(receiver string, total_deposit int64) (err error) {
 	var jsonr map[string]string
 	message := fmt.Sprintf(`{"total_deposit": "%v"}`, total_deposit)
-	status, body, err := lib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
+	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
 	if status == http.StatusOK {
 		err = json.Unmarshal([]byte(body), jsonr)
 		if jsonr["partner_address"] != receiver && err == nil {
@@ -160,7 +160,7 @@ func raiseChannelFunds(receiver string, total_deposit int64) (err error) {
 func closeChannel(receiver string) (err error) {
 	var jsonr map[string]string
 	message := `{"state": "closed"}`
-	status, body, err := lib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
+	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
 	if status == http.StatusOK {
 		err = json.Unmarshal([]byte(body), jsonr)
 		if err != nil && jsonr["state"] != "closed" && jsonr["partner_address"] == receiver {
@@ -178,10 +178,10 @@ func stopPayments(w http.ResponseWriter, r *http.Request) {
 }
 
 func createRaidenEndpoint(ethNode string) {
-	ethAddress, err := lib.LoadEthereumAddress(keystorePath, password, passwordFile)
+	ethAddress, err := raidenlib.LoadEthereumAddress(keystorePath, password, passwordFile)
 	if err != nil {
 		log.Println(err)
-		ethAddress = lib.CreateEthereumAddress(keystorePath, password, passwordFile)
+		ethAddress = raidenlib.CreateEthereumAddress(keystorePath, password, passwordFile)
 	}
 	log.Printf("Loaded Account: %v successfully", ethAddress)
 

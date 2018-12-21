@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"raiden-on-storj/lib"
+	"raiden-on-storj/raidenlib"
 )
 
 const raidenEndpoint = "0.0.0.0:7709"
@@ -72,11 +72,11 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	var err error
 	//Fetch or Generate Ethereum address
 	if ethAddress == "" {
-		ethAddress, err = lib.LoadEthereumAddress(keystorePath, password, passwordFile)
+		ethAddress, err = raidenlib.LoadEthereumAddress(keystorePath, password, passwordFile)
 		if err != nil {
 			log.Println(err)
 			log.Println("Generating new Address..")
-			ethAddress = lib.CreateEthereumAddress(keystorePath, password, passwordFile)
+			ethAddress = raidenlib.CreateEthereumAddress(keystorePath, password, passwordFile)
 		}
 		log.Printf("Using Ethereum Address %v", ethAddress)
 	}
@@ -123,7 +123,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			time.Sleep(20 * time.Second)
 
 			//Send Request to Satellite for starting payments
-			_, _, err := lib.SendRequest("GET", endpoint+ethAddress, "", "application/json")
+			_, _, err := raidenlib.SendRequest("GET", endpoint+ethAddress, "", "application/json")
 			if err != nil {
 				w.WriteHeader(500)
 				w.Header().Set("Content-Type", "application/json")
