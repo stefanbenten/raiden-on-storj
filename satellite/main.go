@@ -27,7 +27,7 @@ const passwordFile = "password.txt"
 
 var channels = map[string]int{}
 var ticker *time.Ticker
-var quit <-chan struct{}
+var quit chan struct{}
 
 func fetchRaidenBinary() {
 	command := exec.Command("sh", "../install.sh")
