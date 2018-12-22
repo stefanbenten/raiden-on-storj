@@ -58,10 +58,23 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 		log.Printf("raiden binary error: %v", err)
 	}
 	pid = command.Process.Pid
-	log.Printf("Started Raiden Binary with PID %v", pid)
-	//Wait 30 Seconds for the Raiden Node to start up
-	time.Sleep(30 * time.Second)
 
+	//Check if Raiden Node is online
+	var down = true
+	resp := fmt.Sprintf(`{"our_address": "%v"}`, address)
+	for down {
+		time.Sleep(time.Second)
+		status, body, err := SendRequest("GET", "http://"+listenAddr+"/api/v1/address", "", "application/json")
+		if status == http.StatusOK && err == nil {
+			log.Println(body)
+			if body == resp {
+				down = false
+			}
+		}
+	}
+	//Wait 30 Seconds for the Raiden Node to start up
+	//time.Sleep(30 * time.Second)
+	log.Printf("Started Raiden Binary with PID %v", pid)
 	return
 }
 

@@ -32,6 +32,7 @@ func sendPayments(receiver string, amount int64) (err error) {
 	go func() {
 		lock.Lock()
 		if closingchannels[receiver] != nil {
+			log.Printf("Payments to %v are already going out", receiver)
 			return
 		}
 		quit := make(chan struct{})
@@ -46,6 +47,7 @@ func sendPayments(receiver string, amount int64) (err error) {
 				log.Printf("Sending Payment to %v at: %s", receiver, t.Format("2006-01-02 15:04:05 +0800"))
 				statuscode, body, err := raidenlib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
 				if err != nil {
+					log.Println(err)
 					return
 				}
 				if statuscode == http.StatusPaymentRequired {
