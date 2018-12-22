@@ -25,7 +25,6 @@ var active = false
 
 func getChannelInfo() (info string, err error) {
 	status, body, err := raidenlib.SendRequest("GET", "http://localhost:7709"+"/api/v1/channels", "{}", "application/json")
-	log.Println("getChannelInfo", status, body)
 	if status == http.StatusOK {
 		return body, nil
 	}
