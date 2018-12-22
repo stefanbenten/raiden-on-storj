@@ -162,7 +162,7 @@ func main() {
 	ethnode := flag.String("ethnode", "http://home.stefan-benten.de:7701", "Ethereum Node Endpoint")
 	raidenEndpoint = *flag.String("listen", "0.0.0.0:7709", "Listen Address for Raiden Endpoint")
 	keystorePath = *flag.String("keystore", "./keystore", "Keystore Path")
-	keystorePath = *flag.String("password", "superStr0ng", "Password used for Keystore encryption")
+	password = *flag.String("password", "superStr0ng", "Password used for Keystore encryption")
 	flag.Parse()
 	prepareETHAddress()
 
