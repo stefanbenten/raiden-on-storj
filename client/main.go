@@ -182,6 +182,7 @@ func main() {
 		if err != nil {
 			log.Fatalln(err)
 		}
+		active = true
 		log.Println("Starting Webserver for manual Interaction")
 	} else {
 		//If not starting directly, open the interface
