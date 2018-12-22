@@ -22,14 +22,20 @@ const keystorePath = "./keystore"
 const password = "superStr0ng"
 const passwordFile = "password.txt"
 
+var accepting = true
 var channels = map[string]int64{}
-var ticker *time.Ticker
-var quit chan struct{}
+var closingchannels = map[string]*chan struct{}{}
+var interval = 2 * time.Second
 var lock *sync.Mutex
 
 func sendPayments(receiver string, amount int64) (err error) {
 	go func() {
 		active := true
+		ticker := time.NewTicker(interval)
+		quit := make(chan struct{})
+		lock.Lock()
+		closingchannels[receiver] = &quit
+		lock.Unlock()
 		for active {
 			select {
 			case t := <-ticker.C:
@@ -50,6 +56,7 @@ func sendPayments(receiver string, amount int64) (err error) {
 				}
 			case <-quit:
 				log.Printf("Stopped Payments to %v", receiver)
+				ticker.Stop()
 				active = false
 				return
 			}
@@ -59,9 +66,8 @@ func sendPayments(receiver string, amount int64) (err error) {
 }
 
 func getChannelInfo(receiver string) (info string, err error) {
-	log.Println(raidenEndpoint + path.Join("channels", tokenAddress, receiver))
 	status, body, err := raidenlib.SendRequest("GET", raidenEndpoint+path.Join("channels", tokenAddress, receiver), "", "application/json")
-	log.Println(status, body)
+	log.Println("getChannelInfo", status, body)
 	//if status == http.StatusOK {
 	return body, nil
 	/*}
@@ -128,13 +134,46 @@ func closeChannel(receiver string) (err error) {
 	return
 }
 
+func checkChannel(receiver string) (id int64, err error) {
+	var jsonr map[string]interface{}
+
+	lock.Lock()
+	id = channels[receiver]
+	lock.Unlock()
+
+	if id == 0 {
+		log.Printf("No Channel with %v found in list, checking API...", receiver)
+		//Fetch Channel Information from API
+		info, err := getChannelInfo(receiver)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		//Map Information
+		err = json.Unmarshal([]byte(info), &jsonr)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		if jsonr["partner_address"] == receiver {
+			id = int64(jsonr["channel_identifier"].(float64))
+		}
+	}
+	return
+}
+
 func stopPayments(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		close(quit)
-		ticker.Stop()
-		w.WriteHeader(200)
+		accepting = false
+		lock.Lock()
+		for address, c := range closingchannels {
+			close(*c)
+			log.Printf("Stopping Payments for: %v", address)
+		}
+		lock.Unlock()
+		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte("Successfully stopped payments"))
+		_, _ = w.Write([]byte(`{"success":"stopped all payments"}`))
 	}
 }
 
@@ -142,52 +181,67 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	address := params["paymentAddress"]
 	if address == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error":"no address provided"}`))
 		return
 	}
-	lock.Lock()
-	check := channels[address]
-	lock.Unlock()
-	if check == 0 {
-		log.Printf("No Channel with %v found, creating...", address)
-		id, err := setupChannel(address, 5000000000)
-		if err != nil && err.Error() != `{"errors": "Channel with given partner address already exists"}` {
-			fmt.Println(err)
-			return
-		}
-		if id == 0 {
-			info, err := getChannelInfo(address)
-			if err == nil {
-				var jsonr map[string]interface{}
-				err = json.Unmarshal([]byte(info), &jsonr)
-				log.Println(jsonr)
-				if jsonr["partner_address"] == address && err == nil {
-					id = int64(jsonr["channel_identifier"].(float64))
-				}
-			} else {
-				log.Println(err)
+	switch r.RequestURI {
+	case path.Join("/payments/start", address):
+
+		//Check For Channel existance, else create new one
+		id, err := checkChannel(address)
+		if err != nil {
+			id, err = setupChannel(address, 5000000000)
+			if err != nil || id == 0 {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(fmt.Sprintf(`{"error":"Channel ID: %v, error: %v"}`, id, err)))
 				return
 			}
+			log.Printf("Channel with %v created, ID is %v", address, id)
 		}
-		log.Printf("Channel with %v created, ID is %v", address, id)
+
 		//Get Lock to prevent Concurrency Issues
 		lock.Lock()
 		channels[address] = id
 		lock.Unlock()
 
-		//check for Ticker and Quit Channel
-		createPaymentInterval(2 * time.Second)
+		//Fire up Payments to the new channel
 		err = sendPayments(address, 1337)
 		if err != nil {
 			fmt.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"error":"Channel ID: %v, error: %v"}`, id, err)))
+			return
 		}
 		w.WriteHeader(200)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`"status":"Opened Channel successfully"`))
-		return
-	}
-	err := closeChannel(address)
-	if err != nil {
-		fmt.Println(err)
+
+	case path.Join("/payments/stop", address):
+		lock.Lock()
+		c := closingchannels[address]
+		close(*c)
+		lock.Unlock()
+		log.Printf("Stopped Payments for: %v", address)
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":"stopped payments for your channel"}`))
+
+	case path.Join("/payments/close", address):
+		err := closeChannel(address)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"error":"%v"}`, err)))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":"Closed Channel successfully"}`))
 	}
 }
 
@@ -249,22 +303,12 @@ func createRaidenEndpoint(ethNode string) {
 	time.Sleep(20 * time.Second)
 }
 
-func createPaymentInterval(interval time.Duration) {
-	log.Println("Checking Payment Interval")
-	if ticker == nil {
-		log.Println("Created Ticker")
-		ticker = time.NewTicker(interval)
-	}
-	if quit == nil {
-		log.Println("Created Quit Channel")
-		quit = make(chan struct{})
-	}
-}
-
 func setupWebserver(addr string) {
 	router := mux.NewRouter()
 	router.HandleFunc("/stop", stopPayments).Methods("GET")
-	router.HandleFunc("/payments/{paymentAddress}", handleChannelRequest).Methods("GET")
+	router.HandleFunc("/payments/start/{paymentAddress}", handleChannelRequest).Methods("GET")
+	router.HandleFunc("/payments/stop/{paymentAddress}", handleChannelRequest).Methods("GET")
+	router.HandleFunc("/payments/close/{paymentAddress}", handleChannelRequest).Methods("GET")
 	router.HandleFunc("/debug", handleDebug).Methods("GET", "POST")
 	err := http.ListenAndServe(addr, router)
 	if err != nil {

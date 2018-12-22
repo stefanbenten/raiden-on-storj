@@ -59,6 +59,7 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 		log.Printf("raiden binary error: %v", err)
 	}
 	pid = command.Process.Pid
+	log.Printf("Started Raiden Binary with PID %v", pid)
 	//Wait 30 Seconds for the Raiden Node to start up
 	time.Sleep(30 * time.Second)
 

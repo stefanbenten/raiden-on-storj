@@ -19,6 +19,18 @@ var ethAddress = ""
 var raidenEndpoint = "0.0.0.0:7709"
 var raidenPID = 0
 
+func getChannelInfo() (info string, err error) {
+	status, body, err := raidenlib.SendRequest("GET", raidenEndpoint+"/api/v1/channels", "", "application/json")
+	log.Println("getChannelInfo", status, body)
+	//if status == http.StatusOK {
+	return body, nil
+	/*}
+	if err == nil {
+		err = errors.New(fmt.Sprintf("Query failed with Status %v", status))
+	}
+	return "", err*/
+}
+
 func prepareETHAddress() {
 	var err error
 	//Fetch or Generate Ethereum address
@@ -34,7 +46,7 @@ func prepareETHAddress() {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-
+	var channelinfos string
 	switch r.Method {
 	case "GET":
 		{
@@ -48,15 +60,29 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
         			<h3>using password: {{.Password}}</h3>
         			<form action="/" method="POST">
             			Satellite Payment Endpoint:<br>
-            			<input name="endpoint" type="text" size=40 value="http://home.stefan-benten.de:7700/start/"><br>
+            			<input name="endpoint" type="text" size=40 value="http://home.stefan-benten.de:7700/payments/"><br>
             			ETH Node Address:<br>
             			<input name="ethnode" type="text" size=40 value="http://home.stefan-benten.de:7701/"><br>
             			<hr>
             			<input type="submit" value="Start Payments!" />
+						{{if .ChannelInfo}}
+						<input type="submit" value="Stop Payments!" />
+						<input type="submit" value="Close Channel.. :(" />
+						{{end}}
         			</form>
+					<hr>
+					{{if .ChannelInfo }}
+					<h3> Channel Information: <h3>
+					{{.ChannelInfo}}{{end}}
     			</body>
 			</html>`)
-
+			if raidenPID != 0 {
+				channelinfos, err = getChannelInfo()
+				if err != nil {
+					log.Println(err)
+					return
+				}
+			}
 			//t, err := template.ParseFiles("./index.html")
 			if err != nil {
 				log.Println(err)
@@ -67,9 +93,11 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			Data := struct {
 				EthereumAddress string
 				Password        string
+				ChannelInfo     string
 			}{
 				ethAddress,
 				password,
+				channelinfos,
 			}
 			//Show Website
 			err = t.Execute(w, Data)
@@ -123,7 +151,7 @@ func main() {
 	skip := flag.Bool("direct", false, "Direct Payment Start with default Endpoints")
 	override := flag.Bool("override", false, "Delete existing KeyStore and generate a new one")
 	endpoint := flag.String("endpoint", "http://home.stefan-benten.de:7700/payments/", "Satellite Payment Endpoint")
-	ethnode := flag.String("ethnode", "http://home.stefan-benten.de:7701", "Ethereum Node Endpoint")
+	ethnode := flag.String("ethnode", "http://home.stefan-benten.de:7701/", "Ethereum Node Endpoint")
 	raidenEndpoint = *flag.String("listen", "0.0.0.0:7709", "Listen Address for Raiden Endpoint")
 	keystorePath = *flag.String("keystore", "./keystore", "Keystore Path")
 	password = *flag.String("password", "superStr0ng", "Password used for Keystore encryption")
@@ -133,7 +161,7 @@ func main() {
 	if *override {
 		err := os.RemoveAll(keystorePath)
 		if err != nil {
-			log.Fatalln("Couldnt delete keystore files, due to:", err)
+			log.Fatalln("Could not delete keystore files, due to:", err)
 		}
 	}
 	prepareETHAddress()
