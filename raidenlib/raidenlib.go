@@ -86,7 +86,6 @@ func SendRequest(method string, url string, message string, contenttype string) 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
 		return
 	}
 	defer resp.Body.Close()
