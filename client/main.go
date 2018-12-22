@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/browser"
@@ -20,7 +21,7 @@ var raidenEndpoint = "0.0.0.0:7709"
 var raidenPID = 0
 
 func getChannelInfo() (info string, err error) {
-	status, body, err := raidenlib.SendRequest("GET", raidenEndpoint+"/api/v1/channels", "", "application/json")
+	status, body, err := raidenlib.SendRequest("GET", "localhost:7709"+"/api/v1/channels", "{}", "application/json")
 	log.Println("getChannelInfo", status, body)
 	//if status == http.StatusOK {
 	return body, nil
@@ -64,10 +65,10 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
             			ETH Node Address:<br>
             			<input name="ethnode" type="text" size=40 value="http://home.stefan-benten.de:7701/"><br>
             			<hr>
-						<button name="start" value="start" type="submit">Start Payments!</button>
+						<button name="function" value="start" type="submit">Start Payments!</button>
 						{{if .ChannelInfo}}
-						<button name="stop" value="stop" type="submit">Stop Payments!</button>
-						<button name="close" value="close" type="submit">Close Channel!</button>
+						<button name="function" value="stop" type="submit">Stop Payments!</button>
+						<button name="function" value="close" type="submit">Close Channel!</button>
 						{{end}}
         			</form>
 					<hr>
@@ -110,7 +111,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		{
 			endpoint := r.FormValue("endpoint")
 			ethnode := r.FormValue("ethnode")
-
+			function := r.FormValue("function")
 			if endpoint == "" || ethnode == "" {
 				w.WriteHeader(500)
 				w.Header().Set("Content-Type", "application/json")
@@ -123,7 +124,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 				raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, ethnode, raidenEndpoint)
 			}
 			//Send Request to Satellite for starting payments
-			_, _, err := raidenlib.SendRequest("GET", endpoint+ethAddress, "", "application/json")
+			_, _, err := raidenlib.SendRequest("GET", endpoint+path.Join("/", function, ethAddress), "", "application/json")
 			if err != nil {
 				w.WriteHeader(500)
 				w.Header().Set("Content-Type", "application/json")
