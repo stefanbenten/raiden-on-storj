@@ -15,13 +15,10 @@ import (
 	"github.com/stefanbenten/raiden-on-storj/raidenlib"
 )
 
-const raidenEndpoint = "0.0.0.0:7709"
-
-//const tokenAddress = "0xd762baF19084256262b3f9164a9183009A9001da"
-const keystorePath = "./keystore/"
-const password = "superStr0ng"
-const passwordFile = "password.txt"
-
+var raidenEndpoint = "0.0.0.0:7709"
+var password = "superStr0ng"
+var passwordFile = "password.txt"
+var keystorePath = "./keystore/"
 var ethAddress = ""
 
 func fetchRaidenBinary() {
@@ -156,6 +153,9 @@ func main() {
 	skip := flag.Bool("direct", false, "Direct Payment Start with default Endpoints")
 	endpoint := flag.String("endpoint", "http://home.stefan-benten.de:7700/start/", "Satellite Payment Endpoint")
 	ethnode := flag.String("ethnode", "http://home.stefan-benten.de:7701", "Ethereum Node Endpoint")
+	raidenEndpoint = *flag.String("listen", "0.0.0.0:7709", "Listen Address for Raiden Endpoint")
+	keystorePath = *flag.String("keystore", "./keystore", "Keystore Path")
+	keystorePath = *flag.String("password", "superStr0ng", "Password used for Keystore encryption")
 	flag.Parse()
 	prepareETHAddress()
 
