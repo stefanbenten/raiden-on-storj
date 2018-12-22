@@ -139,7 +139,7 @@ func setupChannel(receiver string, deposit int64) (channelID int64, err error) {
 		err = json.Unmarshal([]byte(body), &jsonr)
 		if jsonr["partner_address"] == receiver && err == nil {
 			log.Printf("Channel setup successfully for %v with balance of %v", receiver, deposit)
-			channelID, _ = jsonr["channel_identifier"].(int64)
+			channelID = int64(jsonr["channel_identifier"].(float64))
 			return
 		}
 	}
@@ -202,7 +202,7 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 				err = json.Unmarshal([]byte(info), &jsonr)
 				log.Println(jsonr)
 				if jsonr["partner_address"] == address && err == nil {
-					id, _ = jsonr["channel_identifier"].(int64)
+					id = int64(jsonr["channel_identifier"].(float64))
 				}
 			} else {
 				log.Println(err)
