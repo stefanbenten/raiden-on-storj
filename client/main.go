@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"html/template"
 	"log"
@@ -66,9 +67,11 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 	if err != nil {
 		log.Printf("raiden binary error: %v", err)
 	}
+	//Wait 30 Seconds for the Raiden Node to start up
+	time.Sleep(30 * time.Second)
 }
 
-func handleIndex(w http.ResponseWriter, r *http.Request) {
+func prepareETHAddress() {
 	var err error
 	//Fetch or Generate Ethereum address
 	if ethAddress == "" {
@@ -80,6 +83,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("Using Ethereum Address %v", ethAddress)
 	}
+}
+
+func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "GET":
@@ -119,8 +125,6 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 			//Start Raiden Binary
 			startRaidenBinary("./raiden-binary", ethAddress, ethnode)
-			//Wait for Endpoint to start up
-			time.Sleep(20 * time.Second)
 
 			//Send Request to Satellite for starting payments
 			_, _, err := raidenlib.SendRequest("GET", endpoint+ethAddress, "", "application/json")
@@ -149,6 +153,21 @@ func setupWebserver(addr string) {
 }
 
 func main() {
-	fmt.Println("Starting Webserver")
+	skip := flag.Bool("direct", false, "Direct Payment Start with default Endpoints")
+	endpoint := flag.String("endpoint", "http://home.stefan-benten.de:7700/start/", "Satellite Payment Endpoint")
+	ethnode := flag.String("ethnode", "http://home.stefan-benten.de:7701", "Ethereum Node Endpoint")
+	flag.Parse()
+	prepareETHAddress()
+
+	if *skip {
+		//Start Raiden Binary
+		startRaidenBinary("./raiden-binary", ethAddress, *ethnode)
+		_, _, err := raidenlib.SendRequest("GET", *endpoint+ethAddress, "", "application/json")
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
+
+	fmt.Println("Starting Webserver for manual Interaction")
 	setupWebserver("0.0.0.0:7710")
 }
