@@ -20,6 +20,7 @@ var password = "superStr0ng"
 var passwordFile = "password.txt"
 var keystorePath = "./keystore/"
 var ethAddress = ""
+var raidenOnline = false
 
 func fetchRaidenBinary() {
 	command := exec.Command("sh", "../install.sh")
@@ -35,37 +36,43 @@ func fetchRaidenBinary() {
 }
 
 func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
-	log.Printf("Starting Raiden Binary for Address: %v and endpoint: %v", address, ethEndpoint)
+	if !raidenOnline {
+		log.Printf("Starting Raiden Binary for Address: %v and endpoint: %v", address, ethEndpoint)
 
-	exists, err := os.Stat(binarypath)
-	if err != nil || exists.Name() != "raiden-binary" {
-		log.Println("Binary not found, fetching from Repo")
-		fetchRaidenBinary()
+		exists, err := os.Stat(binarypath)
+		if err != nil || exists.Name() != "raiden-binary" {
+			log.Println("Binary not found, fetching from Repo")
+			fetchRaidenBinary()
+		}
+
+		command := exec.Command(binarypath,
+			"--keystore-path", keystorePath,
+			"--password-file", passwordFile,
+			"--address", ethAddress,
+			"--eth-rpc-endpoint", ethEndpoint,
+			"--network-id", "kovan",
+			"--environment-type", "development",
+			"--gas-price", "20000000000",
+			"--api-address", raidenEndpoint,
+			"--rpccorsdomain", "all",
+			"--accept-disclaimer",
+		)
+		log.Printf("Starting Raiden Binary with arguments: %v", command.Args)
+
+		var out bytes.Buffer
+		command.Stdout = &out
+		//Start command but dont wait for the result
+		err = command.Start()
+		if err != nil {
+			log.Printf("raiden binary error: %v", err)
+		}
+		raidenOnline = true
+		//Wait 30 Seconds for the Raiden Node to start up
+		time.Sleep(30 * time.Second)
+
+		return
 	}
-
-	command := exec.Command(binarypath,
-		"--keystore-path", keystorePath,
-		"--password-file", passwordFile,
-		"--address", ethAddress,
-		"--eth-rpc-endpoint", ethEndpoint,
-		"--network-id", "kovan",
-		"--environment-type", "development",
-		"--gas-price", "20000000000",
-		"--api-address", raidenEndpoint,
-		"--rpccorsdomain", "all",
-		"--accept-disclaimer",
-	)
-	log.Printf("Starting Raiden Binary with arguments: %v", command.Args)
-
-	var out bytes.Buffer
-	command.Stdout = &out
-	//Start command but dont wait for the result
-	err = command.Start()
-	if err != nil {
-		log.Printf("raiden binary error: %v", err)
-	}
-	//Wait 30 Seconds for the Raiden Node to start up
-	time.Sleep(30 * time.Second)
+	log.Println("Raiden Endpoint is already running..")
 }
 
 func prepareETHAddress() {
