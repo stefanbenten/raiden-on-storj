@@ -174,6 +174,7 @@ func stopPayments(w http.ResponseWriter, r *http.Request) {
 		lock.Lock()
 		for address, c := range closingchannels {
 			close(*c)
+			closingchannels[address] = nil
 			log.Printf("Stopping Payments for: %v", address)
 		}
 		lock.Unlock()
@@ -236,8 +237,8 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		lock.Lock()
 		c := closingchannels[address]
 		close(*c)
+		closingchannels[address] = nil
 		lock.Unlock()
-		log.Printf("Stopped Payments for: %v", address)
 
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
