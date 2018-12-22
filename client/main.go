@@ -161,8 +161,8 @@ func main() {
 	override := flag.Bool("override", false, "Delete existing KeyStore and generate a new one")
 	endpoint := flag.String("endpoint", "http://home.stefan-benten.de:7700/payments/", "Satellite Payment Endpoint")
 	ethnode := flag.String("ethnode", "http://home.stefan-benten.de:7701/", "Ethereum Node Endpoint")
+	listen := flag.String("listen", "0.0.0.0:7710", "Listen Address for Raiden Endpoint")
 	raidenEndpoint = *flag.String("listen-raiden", "0.0.0.0:7709", "Listen Address for Raiden Endpoint")
-	listen := *flag.String("listen", "0.0.0.0:7710", "Listen Address for Raiden Endpoint")
 	keystorePath = *flag.String("keystore", "./keystore", "Keystore Path")
 	password = *flag.String("password", "superStr0ng", "Password used for Keystore encryption")
 
@@ -186,8 +186,8 @@ func main() {
 	} else {
 		//If not starting directly, open the interface
 		log.Println("Opening Website for User Interaction")
-		_ = browser.OpenURL("http://" + listen)
+		_ = browser.OpenURL("http://" + *listen)
 	}
-	log.Printf("Starting Webserver on address: %v", listen)
-	setupWebserver(listen)
+	log.Printf("Starting Webserver on address: %v", *listen)
+	setupWebserver(*listen)
 }
