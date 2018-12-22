@@ -186,6 +186,12 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"error":"no address provided"}`))
 		return
 	}
+	if !accepting {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error":"not accepting function calls, please try again later"}`))
+		return
+	}
 	switch r.RequestURI {
 	case path.Join("/payments/start", address):
 
