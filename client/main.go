@@ -17,7 +17,6 @@ var passwordFile = "password.txt"
 var keystorePath = "./keystore/"
 var ethAddress = ""
 var raidenEndpoint = "0.0.0.0:7709"
-var raidenOnline = false
 var raidenPID = 0
 
 func prepareETHAddress() {
@@ -148,8 +147,8 @@ func main() {
 		log.Println("Starting Webserver for manual Interaction")
 	} else {
 		//If not starting directly, open the interface
-		browser.OpenURL("http://127.0.0.1:7710")
 		log.Println("Opening Website for User Interaction")
+		_ = browser.OpenURL("http://127.0.0.1:7710")
 	}
 
 	setupWebserver("0.0.0.0:7710")
