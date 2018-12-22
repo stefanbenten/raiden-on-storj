@@ -73,14 +73,13 @@ func sendPayments(receiver string, amount int64) (err error) {
 
 func getChannelInfo(receiver string) (info string, err error) {
 	status, body, err := raidenlib.SendRequest("GET", raidenEndpoint+path.Join("channels", tokenAddress, receiver), "", "application/json")
-	log.Println("getChannelInfo", status, body)
-	//if status == http.StatusOK {
-	return body, nil
-	/*}
-	if err == nil {
-		err = errors.New(fmt.Sprintf("Query failed with Status %v", status))
+	if status == http.StatusOK {
+		return body, nil
 	}
-	return "", err*/
+	if err == nil {
+		err = errors.New(fmt.Sprintf("Channel Info Query failed with Status %v and error: %v", status, err))
+	}
+	return "", err
 }
 
 func setupChannel(receiver string, deposit int64) (channelID int64, err error) {
@@ -99,7 +98,6 @@ func setupChannel(receiver string, deposit int64) (channelID int64, err error) {
 	)
 
 	status, body, err := raidenlib.SendRequest("PUT", raidenEndpoint+"channels", message, "application/json")
-	log.Println(status, body)
 	if status == http.StatusCreated {
 		err = json.Unmarshal([]byte(body), &jsonr)
 		if jsonr["partner_address"] == receiver && err == nil {
@@ -109,7 +107,7 @@ func setupChannel(receiver string, deposit int64) (channelID int64, err error) {
 		}
 	}
 	if err == nil {
-		err = errors.New(body)
+		err = errors.New(fmt.Sprintf("Error with Status %v : %v", status, body))
 	}
 	return 0, err
 }
@@ -120,9 +118,7 @@ func raiseChannelFunds(receiver string, totalDeposit int64) (err error) {
 	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
 	if status == http.StatusOK {
 		err = json.Unmarshal([]byte(body), &jsonr)
-		if jsonr["partner_address"] != receiver && err == nil {
-
-		}
+		//TODO: Handle Raising
 	}
 	return
 }
@@ -152,7 +148,6 @@ func checkChannel(receiver string) (id int64, err error) {
 		//Fetch Channel Information from API
 		info, err := getChannelInfo(receiver)
 		if err != nil {
-			log.Println(err)
 			return 0, err
 		}
 		//Map Information

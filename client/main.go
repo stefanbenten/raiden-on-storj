@@ -29,7 +29,7 @@ func getChannelInfo() (info string, err error) {
 		return body, nil
 	}
 	if err == nil {
-		err = errors.New(fmt.Sprintf("Query failed with Status %v", status))
+		err = errors.New(fmt.Sprintf("Channel Info Query failed with Status %v and error: %v", status, err))
 	}
 	return "", err
 }
