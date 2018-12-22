@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -27,6 +28,7 @@ const passwordFile = "password.txt"
 var channels = map[string]int64{}
 var ticker *time.Ticker
 var quit chan struct{}
+var lock *sync.Mutex
 
 func fetchRaidenBinary() {
 	command := exec.Command("sh", "../install.sh")
@@ -81,7 +83,7 @@ func sendPayments(receiver string, amount int64) (err error) {
 		for active {
 			select {
 			case t := <-ticker.C:
-				log.Printf("Sending Payment to %v at: $v", receiver, t)
+				log.Printf("Sending Payment to %v at: $s", receiver, t.Format("2006-01-02 15:04:05 +0800"))
 				statuscode, body, err := raidenlib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
 				if err != nil {
 					return
@@ -192,7 +194,10 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 	if address == "" {
 		return
 	}
-	if channels[address] == 0 {
+	lock.Lock()
+	check := channels[address]
+	lock.Unlock()
+	if check == 0 {
 		log.Printf("No Channel with %v found, creating...", address)
 		id, err := setupChannel(address, 5000000000)
 		if err != nil && err.Error() != `{"errors": "Channel with given partner address already exists"}` {
@@ -214,7 +219,10 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		log.Printf("Channel with %v created, ID is %v", address, id)
+		//Get Lock to prevent Concurrency Issues
+		lock.Lock()
 		channels[address] = id
+		lock.Unlock()
 
 		//check for Ticker and Quit Channel
 		createPaymentInterval(2 * time.Second)
@@ -227,7 +235,6 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`"status":"Opened Channel successfully"`))
 		return
 	}
-	log.Printf("Found Channel with ID %v, closing...", channels[address])
 	err := closeChannel(address)
 	if err != nil {
 		fmt.Println(err)
@@ -315,6 +322,9 @@ func setupWebserver(addr string) {
 }
 
 func main() {
+	//Create lock for the channel map
+	lock = &sync.Mutex{}
+
 	createRaidenEndpoint("http://home.stefan-benten.de:7701")
 	fmt.Println("Starting Webserver")
 	setupWebserver("0.0.0.0:7700")
