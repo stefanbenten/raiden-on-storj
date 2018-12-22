@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
