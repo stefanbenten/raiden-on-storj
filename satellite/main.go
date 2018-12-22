@@ -311,8 +311,6 @@ func createRaidenEndpoint(ethNode string) {
 
 	u, _ := url.Parse(raidenEndpoint)
 	raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, ethNode, u.Host)
-	//Wait for Binary to start up
-	time.Sleep(20 * time.Second)
 }
 
 func setupWebserver(addr string) {
