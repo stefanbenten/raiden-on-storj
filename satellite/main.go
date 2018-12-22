@@ -77,7 +77,8 @@ func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
 
 func sendPayments(receiver string, amount int64) (err error) {
 	go func() {
-		for {
+		active := true
+		for active {
 			select {
 			case t := <-ticker.C:
 				log.Printf("Sending Payment to %v at: $v", receiver, t)
@@ -96,8 +97,8 @@ func sendPayments(receiver string, amount int64) (err error) {
 					err = raiseChannelFunds(receiver, 5000000000)
 				}
 			case <-quit:
-				ticker.Stop()
 				log.Printf("Stopped Payments to %v", receiver)
+				active = false
 				return
 			}
 		}
@@ -176,10 +177,13 @@ func closeChannel(receiver string) (err error) {
 }
 
 func stopPayments(w http.ResponseWriter, r *http.Request) {
-	close(quit)
-	w.WriteHeader(200)
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte("Successfully stopped payments"))
+	if r.Method == "GET" {
+		close(quit)
+		ticker.Stop()
+		w.WriteHeader(200)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("Successfully stopped payments"))
+	}
 }
 
 func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
@@ -212,6 +216,8 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Channel with %v created, ID is %v", address, id)
 		channels[address] = id
 
+		//check for Ticker and Quit Channel
+		createPaymentInterval(2 * time.Second)
 		err = sendPayments(address, 1337)
 		if err != nil {
 			fmt.Println(err)
@@ -285,6 +291,18 @@ func createRaidenEndpoint(ethNode string) {
 	time.Sleep(20 * time.Second)
 }
 
+func createPaymentInterval(interval time.Duration) {
+	log.Println("Checking Payment Interval")
+	if ticker == nil {
+		log.Println("Created Ticker")
+		ticker = time.NewTicker(interval)
+	}
+	if quit == nil {
+		log.Println("Created Quit Channel")
+		quit = make(chan struct{})
+	}
+}
+
 func setupWebserver(addr string) {
 	router := mux.NewRouter()
 	router.HandleFunc("/stop", stopPayments).Methods("GET")
@@ -297,10 +315,7 @@ func setupWebserver(addr string) {
 }
 
 func main() {
-	fmt.Println("Starting Webserver")
 	createRaidenEndpoint("http://home.stefan-benten.de:7701")
+	fmt.Println("Starting Webserver")
 	setupWebserver("0.0.0.0:7700")
-
-	ticker = time.NewTicker(5 * time.Second)
-	quit = make(chan struct{})
 }
