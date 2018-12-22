@@ -147,13 +147,13 @@ func checkChannel(receiver string) (id int64, err error) {
 		info, err := getChannelInfo(receiver)
 		if err != nil {
 			log.Println(err)
-			return
+			return 0, err
 		}
 		//Map Information
 		err = json.Unmarshal([]byte(info), &jsonr)
 		if err != nil {
 			log.Println(err)
-			return
+			return 0, err
 		}
 		if jsonr["partner_address"] == receiver {
 			id = int64(jsonr["channel_identifier"].(float64))
