@@ -30,12 +30,16 @@ var lock *sync.Mutex
 
 func sendPayments(receiver string, amount int64) (err error) {
 	go func() {
-		active := true
-		ticker := time.NewTicker(interval)
-		quit := make(chan struct{})
 		lock.Lock()
+		if closingchannels[receiver] != nil {
+			return
+		}
+		quit := make(chan struct{})
 		closingchannels[receiver] = &quit
 		lock.Unlock()
+		ticker := time.NewTicker(interval)
+		active := true
+
 		for active {
 			select {
 			case t := <-ticker.C:
