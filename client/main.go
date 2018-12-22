@@ -47,7 +47,7 @@ func prepareETHAddress() {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-	var channelinfos string
+	var channelinfos string = ""
 	switch r.Method {
 	case "GET":
 		{
