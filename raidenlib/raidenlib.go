@@ -66,7 +66,6 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 		time.Sleep(time.Second)
 		status, body, err := SendRequest("GET", "http://"+listenAddr+"/api/v1/address", "", "application/json")
 		if status == http.StatusOK && err == nil {
-			log.Println(body)
 			if body == resp {
 				down = false
 			}
