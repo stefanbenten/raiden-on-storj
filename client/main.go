@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"flag"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -19,17 +21,18 @@ var keystorePath = "./keystore/"
 var ethAddress = ""
 var raidenEndpoint = "0.0.0.0:7709"
 var raidenPID = 0
+var active = false
 
 func getChannelInfo() (info string, err error) {
 	status, body, err := raidenlib.SendRequest("GET", "http://localhost:7709"+"/api/v1/channels", "{}", "application/json")
 	log.Println("getChannelInfo", status, body)
-	//if status == http.StatusOK {
-	return body, nil
-	/*}
+	if status == http.StatusOK {
+		return body, nil
+	}
 	if err == nil {
 		err = errors.New(fmt.Sprintf("Query failed with Status %v", status))
 	}
-	return "", err*/
+	return "", err
 }
 
 func prepareETHAddress() {
@@ -65,11 +68,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
             			ETH Node Address:<br>
             			<input name="ethnode" type="text" size=40 value="http://home.stefan-benten.de:7701/"><br>
             			<hr>
-						<button name="function" value="start" type="submit">Start Payments!</button>
-						{{if .ChannelInfo}}
-						<button name="function" value="stop" type="submit">Stop Payments!</button>
-						<button name="function" value="close" type="submit">Close Channel!</button>
-						{{end}}
+						<button name="function" value="start" type="submit" {{if .Active}}disabled{{end}}>Start Payments!</button>
+						<button name="function" value="stop" type="submit" {{if not .Active}}disabled{{end}}>Stop Payments!</button>
+						<button name="function" value="close" type="submit" {{if not .Active}}disabled{{end}}>Close Channel!</button>
         			</form>
 					<hr>
 					{{if .ChannelInfo }}
@@ -95,10 +96,12 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 				EthereumAddress string
 				Password        string
 				ChannelInfo     string
+				Active          bool
 			}{
 				ethAddress,
 				password,
 				channelinfos,
+				active,
 			}
 			//Show Website
 			err = t.Execute(w, Data)
@@ -112,6 +115,12 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			endpoint := r.FormValue("endpoint")
 			ethnode := r.FormValue("ethnode")
 			function := r.FormValue("function")
+			if function == "start" {
+				active = true
+			} else {
+				active = false
+			}
+
 			if endpoint == "" || ethnode == "" {
 				w.WriteHeader(500)
 				w.Header().Set("Content-Type", "application/json")

@@ -78,11 +78,7 @@ func SendRequest(method string, url string, message string, contenttype string) 
 		return
 	}
 	defer resp.Body.Close()
-
-	statuscode, errc := strconv.Atoi(resp.Status)
-	if errc != nil {
-		statuscode = 500
-	}
+	statuscode = resp.StatusCode
 	bbody, _ := ioutil.ReadAll(resp.Body)
 	body = string(bbody)
 	return
