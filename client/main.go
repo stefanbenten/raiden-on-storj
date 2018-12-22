@@ -64,10 +64,10 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
             			ETH Node Address:<br>
             			<input name="ethnode" type="text" size=40 value="http://home.stefan-benten.de:7701/"><br>
             			<hr>
-            			<input type="submit" value="Start Payments!" />
+						<button name="start" value="start" type="submit">Start Payments!</button>
 						{{if .ChannelInfo}}
-						<input type="submit" value="Stop Payments!" />
-						<input type="submit" value="Close Channel.. :(" />
+						<button name="stop" value="stop" type="submit">Stop Payments!</button>
+						<button name="close" value="close" type="submit">Close Channel!</button>
 						{{end}}
         			</form>
 					<hr>
