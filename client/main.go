@@ -1,79 +1,24 @@
 package main
 
 import (
-	"bytes"
 	"flag"
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
-	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/pkg/browser"
 	"github.com/stefanbenten/raiden-on-storj/raidenlib"
 )
 
-var raidenEndpoint = "0.0.0.0:7709"
 var password = "superStr0ng"
 var passwordFile = "password.txt"
 var keystorePath = "./keystore/"
 var ethAddress = ""
+var raidenEndpoint = "0.0.0.0:7709"
 var raidenOnline = false
-
-func fetchRaidenBinary() {
-	command := exec.Command("sh", "../install.sh")
-	var out bytes.Buffer
-	command.Stdout = &out
-	//Start command and wait for the result
-	err := command.Run()
-	if err != nil {
-		log.Println(err)
-	}
-
-	log.Println("Fetched Raiden Binary successfully")
-}
-
-func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
-	if !raidenOnline {
-		log.Printf("Starting Raiden Binary for Address: %v and endpoint: %v", address, ethEndpoint)
-
-		exists, err := os.Stat(binarypath)
-		if err != nil || exists.Name() != "raiden-binary" {
-			log.Println("Binary not found, fetching from Repo")
-			fetchRaidenBinary()
-		}
-
-		command := exec.Command(binarypath,
-			"--keystore-path", keystorePath,
-			"--password-file", passwordFile,
-			"--address", ethAddress,
-			"--eth-rpc-endpoint", ethEndpoint,
-			"--network-id", "kovan",
-			"--environment-type", "development",
-			"--gas-price", "20000000000",
-			"--api-address", raidenEndpoint,
-			"--rpccorsdomain", "all",
-			"--accept-disclaimer",
-		)
-		log.Printf("Starting Raiden Binary with arguments: %v", command.Args)
-
-		var out bytes.Buffer
-		command.Stdout = &out
-		//Start command but dont wait for the result
-		err = command.Start()
-		if err != nil {
-			log.Printf("raiden binary error: %v", err)
-		}
-		raidenOnline = true
-		//Wait 30 Seconds for the Raiden Node to start up
-		time.Sleep(30 * time.Second)
-
-		return
-	}
-	log.Println("Raiden Endpoint is already running..")
-}
+var raidenPID = 0
 
 func prepareETHAddress() {
 	var err error
@@ -94,7 +39,26 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		{
-			t, err := template.ParseFiles("./index.html")
+			t, err := template.New("test").Parse(`
+			<html>
+			    <head>
+			        <title>Storj Payment Demo</title>
+				</head>
+    			<body>
+        			<h2>The ETH Address used for your Payments is: {{.EthereumAddress}}</h2>
+        			<h3>using password: {{.Password}}</h3>
+        			<form action="/" method="POST">
+            			Satellite Payment Endpoint:<br>
+            			<input name="endpoint" type="text" size=40 value="http://home.stefan-benten.de:7700/start/"><br>
+            			ETH Node Address:<br>
+            			<input name="ethnode" type="text" size=40 value="http://home.stefan-benten.de:7701/"><br>
+            			<hr>
+            			<input type="submit" value="Start Payments!" />
+        			</form>
+    			</body>
+			</html>`)
+
+			//t, err := template.ParseFiles("./index.html")
 			if err != nil {
 				log.Println(err)
 				return
@@ -128,8 +92,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			}
 
 			//Start Raiden Binary
-			startRaidenBinary("./raiden-binary", ethAddress, ethnode)
-
+			if raidenPID == 0 {
+				raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, ethnode, raidenEndpoint)
+			}
 			//Send Request to Satellite for starting payments
 			_, _, err := raidenlib.SendRequest("GET", endpoint+ethAddress, "", "application/json")
 			if err != nil {
@@ -149,7 +114,6 @@ func setupWebserver(addr string) {
 	router := mux.NewRouter()
 	//router.HandleFunc("/", getStatus).Methods("GET")
 	router.HandleFunc("/", handleIndex).Methods("GET", "POST")
-
 	err := http.ListenAndServe(addr, router)
 	if err != nil {
 		log.Fatalln(err)
@@ -158,23 +122,35 @@ func setupWebserver(addr string) {
 
 func main() {
 	skip := flag.Bool("direct", false, "Direct Payment Start with default Endpoints")
-	endpoint := flag.String("endpoint", "http://home.stefan-benten.de:7700/start/", "Satellite Payment Endpoint")
+	override := flag.Bool("override", false, "Delete existing KeyStore and generate a new one")
+	endpoint := flag.String("endpoint", "http://home.stefan-benten.de:7700/payments/", "Satellite Payment Endpoint")
 	ethnode := flag.String("ethnode", "http://home.stefan-benten.de:7701", "Ethereum Node Endpoint")
 	raidenEndpoint = *flag.String("listen", "0.0.0.0:7709", "Listen Address for Raiden Endpoint")
 	keystorePath = *flag.String("keystore", "./keystore", "Keystore Path")
 	password = *flag.String("password", "superStr0ng", "Password used for Keystore encryption")
-	flag.Parse()
-	prepareETHAddress()
 
+	flag.Parse()
+
+	if *override {
+		err := os.RemoveAll(keystorePath)
+		if err != nil {
+			log.Fatalln("Couldnt delete keystore files, due to:", err)
+		}
+	}
+	prepareETHAddress()
 	if *skip {
 		//Start Raiden Binary
-		startRaidenBinary("./raiden-binary", ethAddress, *ethnode)
+		raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, *ethnode, raidenEndpoint)
 		_, _, err := raidenlib.SendRequest("GET", *endpoint+ethAddress, "", "application/json")
 		if err != nil {
 			log.Fatalln(err)
 		}
+		log.Println("Starting Webserver for manual Interaction")
+	} else {
+		//If not starting directly, open the interface
+		browser.OpenURL("http://127.0.0.1:7710")
+		log.Println("Opening Website for User Interaction")
 	}
 
-	fmt.Println("Starting Webserver for manual Interaction")
 	setupWebserver("0.0.0.0:7710")
 }

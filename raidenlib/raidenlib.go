@@ -8,11 +8,62 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 )
+
+func FetchRaidenBinary() {
+	command := exec.Command("sh", "../install.sh")
+	var out bytes.Buffer
+	command.Stdout = &out
+	//Start command and wait for the result
+	err := command.Run()
+	if err != nil {
+		log.Println(err)
+	}
+
+	log.Println("Fetched Raiden Binary successfully")
+}
+
+func StartRaidenBinary(binarypath string, keystorePath string, passwordFile string, address string, ethEndpoint string, listenAddr string) (pid int) {
+	log.Printf("Starting Raiden Binary for Address: %v and endpoint: %v", address, ethEndpoint)
+
+	exists, err := os.Stat(binarypath)
+	if err != nil || exists.Name() != "raiden-binary" {
+		log.Println("Binary not found, fetching from Repo")
+		FetchRaidenBinary()
+	}
+
+	command := exec.Command(binarypath,
+		"--keystore-path", keystorePath,
+		"--password-file", passwordFile,
+		"--address", address,
+		"--eth-rpc-endpoint", ethEndpoint,
+		"--network-id", "kovan",
+		"--environment-type", "development",
+		"--gas-price", "20000000000",
+		"--api-address", listenAddr,
+		"--rpccorsdomain", "all",
+		"--accept-disclaimer",
+	)
+
+	var out bytes.Buffer
+	command.Stdout = &out
+	//Start command but dont wait for the result
+	err = command.Start()
+	if err != nil {
+		log.Printf("raiden binary error: %v", err)
+	}
+	pid = command.Process.Pid
+	//Wait 30 Seconds for the Raiden Node to start up
+	time.Sleep(30 * time.Second)
+
+	return
+}
 
 func SendRequest(method string, url string, message string, contenttype string) (statuscode int, body string, err error) {
 	var jsonStr = []byte(message)

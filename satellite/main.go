@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,8 +8,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
-	"os/exec"
 	"path"
 	"sync"
 	"time"
@@ -30,60 +27,13 @@ var ticker *time.Ticker
 var quit chan struct{}
 var lock *sync.Mutex
 
-func fetchRaidenBinary() {
-	command := exec.Command("sh", "../install.sh")
-	var out bytes.Buffer
-	command.Stdout = &out
-	//Start command and wait for the result
-	err := command.Run()
-	if err != nil {
-		log.Println(err)
-	}
-
-	log.Println("Successfully got Raiden Binary")
-}
-
-func startRaidenBinary(binarypath string, address string, ethEndpoint string) {
-	log.Printf("Starting Raiden Binary for Address: %v and endpoint: %v", address, ethEndpoint)
-
-	exists, err := os.Stat(binarypath)
-	if err != nil || exists.Name() != "raiden-binary" {
-		log.Println("Binary not found, fetching from Repo")
-		fetchRaidenBinary()
-	}
-
-	u, _ := url.Parse(raidenEndpoint)
-
-	command := exec.Command(binarypath,
-		"--accept-disclaimer",
-		"--keystore-path", keystorePath,
-		"--password-file", passwordFile,
-		"--address", address,
-		"--eth-rpc-endpoint", ethEndpoint,
-		"--network-id", "kovan",
-		"--environment-type", "development",
-		"--gas-price", "20000000000",
-		"--api-address", u.Host,
-		"--rpccorsdomain", "all",
-	)
-	// set var to get the output
-	var out bytes.Buffer
-
-	// set the output to our variable
-	command.Stdout = &out
-	err = command.Start()
-	if err != nil {
-		log.Println(err)
-	}
-}
-
 func sendPayments(receiver string, amount int64) (err error) {
 	go func() {
 		active := true
 		for active {
 			select {
 			case t := <-ticker.C:
-				log.Printf("Sending Payment to %v at: $s", receiver, t.Format("2006-01-02 15:04:05 +0800"))
+				log.Printf("Sending Payment to %v at: %s", receiver, t.Format("2006-01-02 15:04:05 +0800"))
 				statuscode, body, err := raidenlib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
 				if err != nil {
 					return
@@ -293,7 +243,8 @@ func createRaidenEndpoint(ethNode string) {
 	}
 	log.Printf("Loaded Account: %v successfully", ethAddress)
 
-	startRaidenBinary("./raiden-binary", ethAddress, ethNode)
+	u, _ := url.Parse(raidenEndpoint)
+	raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, ethNode, u.Host)
 	//Wait for Binary to start up
 	time.Sleep(20 * time.Second)
 }
@@ -313,7 +264,7 @@ func createPaymentInterval(interval time.Duration) {
 func setupWebserver(addr string) {
 	router := mux.NewRouter()
 	router.HandleFunc("/stop", stopPayments).Methods("GET")
-	router.HandleFunc("/start/{paymentAddress}", handleChannelRequest).Methods("GET")
+	router.HandleFunc("/payments/{paymentAddress}", handleChannelRequest).Methods("GET")
 	router.HandleFunc("/debug", handleDebug).Methods("GET", "POST")
 	err := http.ListenAndServe(addr, router)
 	if err != nil {
@@ -326,6 +277,6 @@ func main() {
 	lock = &sync.Mutex{}
 
 	createRaidenEndpoint("http://home.stefan-benten.de:7701")
-	fmt.Println("Starting Webserver")
+	log.Println("Starting Webserver")
 	setupWebserver("0.0.0.0:7700")
 }
