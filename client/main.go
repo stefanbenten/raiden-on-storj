@@ -132,16 +132,16 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 				raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, ethnode, raidenEndpoint)
 			}
 			//Send Request to Satellite for starting payments
-			_, _, err := raidenlib.SendRequest("GET", endpoint+path.Join(function, ethAddress), "", "application/json")
+			status, body, err := raidenlib.SendRequest("GET", endpoint+path.Join(function, ethAddress), "", "application/json")
 			if err != nil {
 				w.WriteHeader(500)
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte("Issue starting payment system, please check the log files"))
 				return
 			}
-			w.WriteHeader(200)
+			w.WriteHeader(status)
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte("Successfully started payment system"))
+			_, _ = w.Write([]byte(body))
 		}
 	}
 }
@@ -183,12 +183,11 @@ func main() {
 			log.Fatalln(err)
 		}
 		active = true
-		log.Println("Starting Webserver for manual Interaction")
 	} else {
 		//If not starting directly, open the interface
 		log.Println("Opening Website for User Interaction")
 		_ = browser.OpenURL("http://" + listen)
 	}
-
+	log.Printf("Starting Webserver on address: %v", listen)
 	setupWebserver(listen)
 }

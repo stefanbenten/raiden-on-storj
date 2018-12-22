@@ -226,7 +226,7 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(200)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`"status":"Opened Channel successfully"`))
+		_, _ = w.Write([]byte(`"success":"Opened Channel successfully"`))
 
 	case path.Join("/payments/stop", address):
 		lock.Lock()
