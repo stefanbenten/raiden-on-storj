@@ -24,7 +24,7 @@ var raidenPID = 0
 var active = false
 
 func getChannelInfo() (info string, err error) {
-	status, body, err := raidenlib.SendRequest("GET", "http://localhost:7709"+"/api/v1/channels", "{}", "application/json")
+	status, body, err := raidenlib.SendRequest("GET", "http://"+raidenEndpoint+"/api/v1/channels", "{}", "application/json")
 	if status == http.StatusOK {
 		return body, nil
 	}
@@ -161,7 +161,8 @@ func main() {
 	override := flag.Bool("override", false, "Delete existing KeyStore and generate a new one")
 	endpoint := flag.String("endpoint", "http://home.stefan-benten.de:7700/payments/", "Satellite Payment Endpoint")
 	ethnode := flag.String("ethnode", "http://home.stefan-benten.de:7701/", "Ethereum Node Endpoint")
-	raidenEndpoint = *flag.String("listen", "0.0.0.0:7709", "Listen Address for Raiden Endpoint")
+	raidenEndpoint = *flag.String("listen-raiden", "0.0.0.0:7709", "Listen Address for Raiden Endpoint")
+	listen := *flag.String("listen", "0.0.0.0:7710", "Listen Address for Raiden Endpoint")
 	keystorePath = *flag.String("keystore", "./keystore", "Keystore Path")
 	password = *flag.String("password", "superStr0ng", "Password used for Keystore encryption")
 
@@ -185,8 +186,8 @@ func main() {
 	} else {
 		//If not starting directly, open the interface
 		log.Println("Opening Website for User Interaction")
-		_ = browser.OpenURL("http://127.0.0.1:7710")
+		_ = browser.OpenURL("http://" + listen)
 	}
 
-	setupWebserver("0.0.0.0:7710")
+	setupWebserver(listen)
 }
