@@ -162,10 +162,13 @@ func main() {
 	endpoint := flag.String("endpoint", "http://home.stefan-benten.de:7700/payments/", "Satellite Payment Endpoint")
 	ethnode := flag.String("ethnode", "http://home.stefan-benten.de:7701/", "Ethereum Node Endpoint")
 	listen := flag.String("listen", "0.0.0.0:7710", "Listen Address for Raiden Endpoint")
-	raidenEndpoint = *flag.String("listen-raiden", "0.0.0.0:7709", "Listen Address for Raiden Endpoint")
-	keystorePath = *flag.String("keystore", "./keystore", "Keystore Path")
-	password = *flag.String("password", "superStr0ng", "Password used for Keystore encryption")
-
+	raiden := flag.String("listen-raiden", "0.0.0.0:7709", "Listen Address for Raiden Endpoint")
+	keystore := flag.String("keystore", "./keystore", "Keystore Path")
+	pw := flag.String("password", "superStr0ng", "Password used for Keystore encryption")
+	raidenEndpoint = *raiden
+	keystorePath = *keystore
+	password = *pw
+	log.Println(raidenEndpoint, keystorePath, password)
 	flag.Parse()
 
 	if *override {
