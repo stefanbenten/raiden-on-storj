@@ -165,11 +165,12 @@ func main() {
 	raiden := flag.String("listen-raiden", "0.0.0.0:7709", "Listen Address for Raiden Endpoint")
 	keystore := flag.String("keystore", "./keystore", "Keystore Path")
 	pw := flag.String("password", "superStr0ng", "Password used for Keystore encryption")
+
+	flag.Parse()
+
 	raidenEndpoint = *raiden
 	keystorePath = *keystore
 	password = *pw
-	log.Println(raidenEndpoint, keystorePath, password)
-	flag.Parse()
 
 	if *override {
 		err := os.RemoveAll(keystorePath)
