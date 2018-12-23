@@ -165,19 +165,25 @@ func checkChannel(receiver string) (id int64, err error) {
 
 func stopPayments(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		accepting = false
-		lock.Lock()
-		for address, c := range closingchannels {
-			if c != nil {
-				close(*c)
-				closingchannels[address] = nil
-				log.Printf("Stopping Payments for: %v", address)
+		if r.FormValue("password") == "stop" {
+			accepting = false
+			lock.Lock()
+			for address, c := range closingchannels {
+				if c != nil {
+					close(*c)
+					closingchannels[address] = nil
+					log.Printf("Stopping Payments for: %v", address)
+				}
 			}
+			lock.Unlock()
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"success":"stopped all payments"}`))
+			return
 		}
-		lock.Unlock()
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusUnauthorized)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"success":"stopped all payments"}`))
+		_, _ = w.Write([]byte(`{"error":"not authenticated"}`))
 	}
 }
 
