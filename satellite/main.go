@@ -168,9 +168,11 @@ func stopPayments(w http.ResponseWriter, r *http.Request) {
 		accepting = false
 		lock.Lock()
 		for address, c := range closingchannels {
-			close(*c)
-			closingchannels[address] = nil
-			log.Printf("Stopping Payments for: %v", address)
+			if c != nil {
+				close(*c)
+				closingchannels[address] = nil
+				log.Printf("Stopping Payments for: %v", address)
+			}
 		}
 		lock.Unlock()
 		w.WriteHeader(http.StatusOK)
