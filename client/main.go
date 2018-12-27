@@ -77,6 +77,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 					{{.ChannelInfo}}{{end}}
     			</body>
 			</html>`)
+
 			if raidenPID != 0 {
 				channelinfos, err = getChannelInfo()
 				if err != nil {
@@ -171,17 +172,22 @@ func main() {
 	raidenEndpoint = *raiden
 	keystorePath = *keystore
 	password = *pw
-
+	log.Println(*raiden, raidenEndpoint)
+	log.Println(*pw, password)
+	log.Println(*keystore, keystorePath)
+	// if Override is requested, it deletes all existing keystore files
 	if *override {
 		err := os.RemoveAll(keystorePath)
 		if err != nil {
 			log.Fatalln("Could not delete keystore files, due to:", err)
 		}
 	}
+	//Load Ethereum Address or generate a new one
 	prepareETHAddress()
+	//When using the direct flag start Raiden directly and request payments
 	if *skip {
 		//Start Raiden Binary
-		raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, *ethnode, raidenEndpoint)
+		raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", *keystore, *pw, ethAddress, *ethnode, *raiden)
 		_, _, err := raidenlib.SendRequest("GET", *endpoint+path.Join("start", ethAddress), "", "application/json")
 		if err != nil {
 			log.Fatalln(err)

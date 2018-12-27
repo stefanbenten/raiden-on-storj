@@ -115,7 +115,7 @@ func setupChannel(receiver string, deposit int64) (channelID int64, err error) {
 func raiseChannelFunds(receiver string, totalDeposit int64) (err error) {
 	var jsonr map[string]interface{}
 	message := fmt.Sprintf(`{"total_deposit": "%v"}`, totalDeposit)
-	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
+	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+path.Join("channels", tokenAddress, receiver), message, "application/json")
 	if status == http.StatusOK {
 		err = json.Unmarshal([]byte(body), &jsonr)
 		//TODO: Handle Raising
