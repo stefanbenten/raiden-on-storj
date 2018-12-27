@@ -69,9 +69,22 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 
 	//Check if Raiden Node is online
 	var down = true
+	var counter = 0
 	resp := fmt.Sprintf(`{"our_address": "%v"}`, address)
 	for down {
-		log.Println("Raiden Startup is ongoing..")
+		_, err := os.FindProcess(pid)
+		if err != nil {
+			log.Println("Raiden process died, please check Raiden logs")
+			return 0
+		}
+		// After waiting 5 minutes error out
+		if counter >= 300 {
+			return 0
+		}
+		//give proactive response if process isnt died yet
+		if counter%5 == 0 {
+			log.Println("Raiden Startup is ongoing..")
+		}
 		time.Sleep(time.Second)
 		status, body, err := SendRequest("GET", "http://"+listenAddr+"/api/v1/address", "", "application/json")
 		if status == http.StatusOK && err == nil {
@@ -79,6 +92,7 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 				down = false
 			}
 		}
+		counter++
 	}
 	log.Printf("Started Raiden Binary with PID %v", pid)
 	return

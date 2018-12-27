@@ -78,17 +78,18 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
     			</body>
 			</html>`)
 
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			//Get Channel Info, if Raiden is running
 			if raidenPID != 0 {
 				channelinfos, err = getChannelInfo()
 				if err != nil {
 					log.Println(err)
 					return
 				}
-			}
-			//t, err := template.ParseFiles("./index.html")
-			if err != nil {
-				log.Println(err)
-				return
 			}
 
 			//Create Website Data
@@ -131,6 +132,14 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			//Start Raiden Binary if necessary
 			if raidenPID == 0 {
 				raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, ethnode, raidenEndpoint)
+				//if PID is still 0, there is an issue
+				if raidenPID == 0 {
+					log.Println("error: unable to start Raiden Binary")
+					w.WriteHeader(500)
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = w.Write([]byte("Issue starting payment system, please check the log files"))
+					return
+				}
 			}
 			//Send Request to Satellite for interaction
 			status, body, err := raidenlib.SendRequest("GET", endpoint+path.Join(function, ethAddress), "", "application/json")
@@ -190,6 +199,9 @@ func main() {
 		//Start Raiden Binary
 		log.Println("Skip Flag set, starting Raiden Binary..")
 		raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", *keystore, *pw, ethAddress, *ethnode, *raiden)
+		if raidenPID == 0 {
+			log.Fatalln("error: unable to start Raiden Binary")
+		}
 		_, _, err := raidenlib.SendRequest("GET", *endpoint+path.Join("start", ethAddress), "", "application/json")
 		if err != nil {
 			log.Fatalln(err)
