@@ -29,7 +29,7 @@ func FetchRaidenBinary() {
 }
 
 func StartRaidenBinary(binarypath string, keystorePath string, passwordFile string, address string, ethEndpoint string, listenAddr string) (pid int) {
-	log.Printf("Starting Raiden Binary for Address: %v and endpoint: %v", address, ethEndpoint)
+	log.Printf("Starting Raiden Binary for Address: %v and endpoint: %v on listen Address: %v", address, ethEndpoint, listenAddr)
 
 	exists, err := os.Stat(binarypath)
 	if err != nil || exists.Name() != "raiden-binary" {
@@ -50,14 +50,20 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 		"--accept-disclaimer",
 	)
 
-	var out bytes.Buffer
+	var out, errs bytes.Buffer
 	command.Stdout = &out
+	command.Stderr = &errs
+
 	//Start command but dont wait for the result
 	err = command.Start()
 	if err != nil {
 		log.Printf("raiden binary error: %v", err)
 	}
 	pid = command.Process.Pid
+	if pid == 0 {
+		log.Println("Raiden STDOUT:", out.String())
+		log.Println("Raiden ERROUT:", errs.String())
+	}
 
 	//Check if Raiden Node is online
 	var down = true

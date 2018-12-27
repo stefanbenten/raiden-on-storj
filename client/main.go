@@ -128,11 +128,11 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			//Start Raiden Binary
+			//Start Raiden Binary if necessary
 			if raidenPID == 0 {
 				raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, ethnode, raidenEndpoint)
 			}
-			//Send Request to Satellite for starting payments
+			//Send Request to Satellite for interaction
 			status, body, err := raidenlib.SendRequest("GET", endpoint+path.Join(function, ethAddress), "", "application/json")
 			if err != nil {
 				w.WriteHeader(500)
@@ -140,6 +140,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte("Issue starting payment system, please check the log files"))
 				return
 			}
+			log.Printf("Successfully executed channel request for payments: %v ", function)
 			w.WriteHeader(status)
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(body))
