@@ -188,6 +188,7 @@ func main() {
 	//When using the direct flag start Raiden directly and request payments
 	if *skip {
 		//Start Raiden Binary
+		log.Println("Skip Flag set, starting Raiden Binary..")
 		raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", *keystore, *pw, ethAddress, *ethnode, *raiden)
 		_, _, err := raidenlib.SendRequest("GET", *endpoint+path.Join("start", ethAddress), "", "application/json")
 		if err != nil {
