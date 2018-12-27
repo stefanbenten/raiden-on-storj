@@ -85,6 +85,7 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 		if counter%5 == 0 {
 			log.Println("Raiden Startup is ongoing..")
 		}
+		counter++
 		time.Sleep(time.Second)
 		status, body, err := SendRequest("GET", "http://"+listenAddr+"/api/v1/address", "", "application/json")
 		if status == http.StatusOK && err == nil {
@@ -92,7 +93,6 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 				down = false
 			}
 		}
-		counter++
 	}
 	log.Printf("Started Raiden Binary with PID %v", pid)
 	return

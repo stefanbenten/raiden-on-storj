@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"html/template"
 	"log"
@@ -26,6 +27,7 @@ var accepting = true
 var channels = map[string]int64{}
 var closingchannels = map[string]*chan struct{}{}
 var interval = 2 * time.Second
+var payAmount int64 = 1337
 var lock *sync.Mutex
 
 func sendPayments(receiver string, amount int64) (err error) {
@@ -118,7 +120,13 @@ func raiseChannelFunds(receiver string, totalDeposit int64) (err error) {
 	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+path.Join("channels", tokenAddress, receiver), message, "application/json")
 	if status == http.StatusOK {
 		err = json.Unmarshal([]byte(body), &jsonr)
-		//TODO: Handle Raising
+		if err != nil {
+			return
+		}
+		if int64(jsonr["total_deposit"].(float64)) == totalDeposit {
+			log.Printf("Successfully raised channel funds to %v in channel with: %v", totalDeposit, receiver)
+			log.Printf("Channel Balance is now: %v", int64(jsonr["balance"].(float64)))
+		}
 	}
 	return
 }
@@ -224,7 +232,7 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		lock.Unlock()
 
 		//Fire up Payments to the new channel
-		err = sendPayments(address, 1337)
+		err = sendPayments(address, payAmount)
 		if err != nil {
 			fmt.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -331,6 +339,13 @@ func setupWebserver(addr string) {
 }
 
 func main() {
+	tm := flag.Int("interval", 2000, "Interval for sending payments (microseconds)")
+	pm := flag.Int64("paymentvalue", 1337, "Amount to be sent per each payment")
+	flag.Parse()
+	payAmount = *pm
+	interval = time.Duration(*tm) * time.Microsecond
+	log.Printf("Setting Payment Interval to %v and payment amount to %v", interval, payAmount)
+
 	//Create lock for the channel map
 	lock = &sync.Mutex{}
 
