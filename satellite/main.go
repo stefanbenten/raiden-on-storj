@@ -343,7 +343,7 @@ func main() {
 	pm := flag.Int64("paymentvalue", 1337, "Amount to be sent per each payment")
 	flag.Parse()
 	payAmount = *pm
-	interval = time.Duration(*tm) * time.Microsecond
+	interval = time.Duration(*tm) * time.Millisecond
 	log.Printf("Setting Payment Interval to %v and payment amount to %v", interval, payAmount)
 
 	//Create lock for the channel map
