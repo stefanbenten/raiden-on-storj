@@ -1,4 +1,4 @@
-module github.com/stefanbenten/raiden-on-storj/raidenlib/
+module github.com/stefanbenten/raiden-on-storj/raidenlib
 
 require (
 	github.com/allegro/bigcache v1.1.0 // indirect
