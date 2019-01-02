@@ -146,7 +146,7 @@ func closeChannel(receiver string) (err error) {
 		}
 		return nil
 	} else {
-		return errors.New("unable to close channel! Please check the Raiden log files")
+		return errors.New("unable to close channel! Please check the Raiden log files - " + string(status) + body)
 	}
 }
 
