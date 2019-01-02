@@ -69,7 +69,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
             			<hr>
 						<button name="function" value="start" type="submit" {{if .Active}}disabled{{end}}>Start Payments!</button>
 						<button name="function" value="stop" type="submit" {{if not .Active}}disabled{{end}}>Stop Payments!</button>
-						<button name="function" value="close" type="submit" {{if not .Active}}disabled{{end}}>Close Channel!</button>
+						{{if .ChannelInfo}}<button name="function" value="close" type="submit" {{if .Active}}disabled{{end}}>Close Channel!</button>{{end}}
         			</form>
 					<hr>
 					{{if .ChannelInfo }}
@@ -176,15 +176,13 @@ func main() {
 	raiden := flag.String("listen-raiden", "0.0.0.0:7709", "Listen Address for Raiden Endpoint")
 	keystore := flag.String("keystore", "./keystore", "Keystore Path")
 	pw := flag.String("password", "superStr0ng", "Password used for Keystore encryption")
-
 	flag.Parse()
 
+	//Set global variables
 	raidenEndpoint = *raiden
 	keystorePath = *keystore
 	password = *pw
-	log.Println(*raiden, raidenEndpoint)
-	log.Println(*pw, password)
-	log.Println(*keystore, keystorePath)
+
 	// if Override is requested, it deletes all existing keystore files
 	if *override {
 		err := os.RemoveAll(keystorePath)
@@ -192,9 +190,11 @@ func main() {
 			log.Fatalln("Could not delete keystore files, due to:", err)
 		}
 	}
+
 	//Load Ethereum Address or generate a new one
 	prepareETHAddress()
-	//When using the direct flag start Raiden directly and request payments
+
+	//When using the direct flag start Raiden directly and request payments, else open an browser interface for interaction
 	if *skip {
 		//Start Raiden Binary
 		log.Println("Skip Flag set, starting Raiden Binary..")
@@ -208,9 +208,11 @@ func main() {
 		}
 		active = true
 	} else {
-		//If not starting directly, open the interface
 		log.Println("Opening Website for User Interaction")
-		_ = browser.OpenURL("http://" + *listen)
+		err := browser.OpenURL("http://" + *listen)
+		if err != nil {
+			log.Println("error opening webbrowser window")
+		}
 	}
 	log.Printf("Starting Webserver on address: %v", *listen)
 	setupWebserver(*listen)
