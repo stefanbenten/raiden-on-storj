@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"sync"
 	"time"
 
@@ -134,19 +135,18 @@ func raiseChannelFunds(receiver string, totalDeposit int64) (err error) {
 func closeChannel(receiver string) (err error) {
 	var jsonr map[string]interface{}
 	message := `{"state": "closed"}`
-	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+"channels", message, "application/json")
+	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+path.Join("channels", tokenAddress, receiver), message, "application/json")
 	if err != nil {
 		return err
 	}
 	if status == http.StatusOK {
 		err = json.Unmarshal([]byte(body), &jsonr)
 		if err != nil && jsonr["state"] != "closed" && jsonr["partner_address"] == receiver {
-			log.Println(jsonr)
 			return errors.New("unable to close channel! Please check the Raiden log files")
 		}
 		return nil
 	} else {
-		return errors.New("unable to close channel! Please check the Raiden log files - " + string(status) + body)
+		return errors.New("unable to close channel! Please check the Raiden log files - " + strconv.Itoa(status) + body)
 	}
 }
 
