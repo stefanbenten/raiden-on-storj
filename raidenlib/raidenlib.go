@@ -10,19 +10,21 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 )
 
 func FetchRaidenBinary() {
-	command := exec.Command("sh", "../install.sh")
+	command := exec.Command("sh", "../install.sh", runtime.GOOS)
 	var out bytes.Buffer
 	command.Stdout = &out
 	//Start command and wait for the result
 	err := command.Run()
 	if err != nil {
-		log.Println(err)
+		//If unable to fetch Raiden Binary quit
+		log.Fatalln(err)
 	}
 
 	log.Println("Fetched Raiden Binary successfully")
