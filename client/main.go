@@ -69,7 +69,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
             			<hr>
 						<button name="function" value="start" type="submit" {{if .Active}}disabled{{end}}>Start Payments!</button>
 						<button name="function" value="stop" type="submit" {{if not .Active}}disabled{{end}}>Stop Payments!</button>
-						{{if .ChannelInfo}}<button name="function" value="close" type="submit" {{if .Active}}disabled{{end}}>Close Channel!</button>{{end}}
+						<!--{{if .ChannelInfo}}<button name="function" value="close" type="submit" {{if .Active}}disabled{{end}}>Close Channel!</button>{{end}}-->
         			</form>
 					<hr>
 					{{if .ChannelInfo }}
