@@ -28,10 +28,40 @@ var accepting = true
 var channels = map[string]int64{}
 var closingchannels = map[string]*chan struct{}{}
 var interval = 2 * time.Second
+var deposit int64 = 5000000000
 var payAmount int64 = 1337
 var lock *sync.Mutex
 
-func sendPayments(receiver string, amount int64) (err error) {
+//checkChannelID does a lookup for the ChannelID to receiver and returns ID or error when not existing
+func checkChannelID(receiver string) (id int64, err error) {
+	var jsonr map[string]interface{}
+
+	lock.Lock()
+	id = channels[receiver]
+	lock.Unlock()
+
+	if id == 0 {
+		log.Printf("No Channel with %s found in local list, checking API...", receiver)
+		//Fetch Channel Information from API
+		info, err := getChannelInfo(receiver)
+		if err != nil {
+			return 0, err
+		}
+		//Map Information
+		err = json.Unmarshal([]byte(info), &jsonr)
+		if err != nil {
+			log.Println(err)
+			return 0, err
+		}
+		if jsonr["partner_address"] == receiver {
+			id = int64(jsonr["channel_identifier"].(float64))
+		}
+	}
+	return
+}
+
+//startPayments starts a go routine which sends every interval the amount to receiver
+func startPayments(receiver string, amount int64) (err error) {
 	go func() {
 		lock.Lock()
 		if closingchannels[receiver] != nil {
@@ -74,17 +104,44 @@ func sendPayments(receiver string, amount int64) (err error) {
 	return
 }
 
+//stopPayments destroys payment go routine
+func stopPayments(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		if r.FormValue("password") == "stop" {
+			accepting = false
+			lock.Lock()
+			for address, c := range closingchannels {
+				if c != nil {
+					close(*c)
+					closingchannels[address] = nil
+					log.Printf("Stopping Payments for: %v", address)
+				}
+			}
+			lock.Unlock()
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"success":"stopped all payments"}`))
+			return
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error":"not authenticated"}`))
+	}
+}
+
+//getChannelInfo returns the Raiden Channel Information as json encoded string
 func getChannelInfo(receiver string) (info string, err error) {
 	status, body, err := raidenlib.SendRequest("GET", raidenEndpoint+path.Join("channels", tokenAddress, receiver), "", "application/json")
 	if status == http.StatusOK {
 		return body, nil
 	}
 	if err == nil {
-		err = errors.New(fmt.Sprintf("Channel Info Query failed with Status %v and error: %v", status, err))
+		err = errors.New(fmt.Sprintf("Channel Info Query failed, error: %v", err))
 	}
 	return "", err
 }
 
+//setupChannel creates a new channel with receiver and funds it with deposit
 func setupChannel(receiver string, deposit int64) (channelID int64, err error) {
 	var jsonr map[string]interface{}
 
@@ -115,6 +172,7 @@ func setupChannel(receiver string, deposit int64) (channelID int64, err error) {
 	return 0, err
 }
 
+//raiseChannelFunds increases the current channel deposit with receiver to totalDeposit
 func raiseChannelFunds(receiver string, totalDeposit int64) (err error) {
 	var jsonr map[string]interface{}
 	message := fmt.Sprintf(`{"total_deposit": "%v"}`, totalDeposit)
@@ -132,6 +190,7 @@ func raiseChannelFunds(receiver string, totalDeposit int64) (err error) {
 	return
 }
 
+//closeChannel is closing the channel with receiver
 func closeChannel(receiver string) (err error) {
 	var jsonr map[string]interface{}
 	message := `{"state": "closed"}`
@@ -150,57 +209,7 @@ func closeChannel(receiver string) (err error) {
 	}
 }
 
-func checkChannel(receiver string) (id int64, err error) {
-	var jsonr map[string]interface{}
-
-	lock.Lock()
-	id = channels[receiver]
-	lock.Unlock()
-
-	if id == 0 {
-		log.Printf("No Channel with %v found in list, checking API...", receiver)
-		//Fetch Channel Information from API
-		info, err := getChannelInfo(receiver)
-		if err != nil {
-			return 0, err
-		}
-		//Map Information
-		err = json.Unmarshal([]byte(info), &jsonr)
-		if err != nil {
-			log.Println(err)
-			return 0, err
-		}
-		if jsonr["partner_address"] == receiver {
-			id = int64(jsonr["channel_identifier"].(float64))
-		}
-	}
-	return
-}
-
-func stopPayments(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		if r.FormValue("password") == "stop" {
-			accepting = false
-			lock.Lock()
-			for address, c := range closingchannels {
-				if c != nil {
-					close(*c)
-					closingchannels[address] = nil
-					log.Printf("Stopping Payments for: %v", address)
-				}
-			}
-			lock.Unlock()
-			w.WriteHeader(http.StatusOK)
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"success":"stopped all payments"}`))
-			return
-		}
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"error":"not authenticated"}`))
-	}
-}
-
+//handleChannelRequest handles all WebRequests from Clients
 func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	address := params["paymentAddress"]
@@ -220,16 +229,17 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 	case path.Join("/payments/start", address):
 
 		//Check For Channel existance, else create new one
-		id, err := checkChannel(address)
+		id, err := checkChannelID(address)
 		if err != nil {
-			id, err = setupChannel(address, 5000000000)
+			log.Printf("Creating Channel with %s and deposit %v", address, deposit)
+			id, err = setupChannel(address, deposit)
 			if err != nil || id == 0 {
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte(fmt.Sprintf(`{"error":"Channel ID: %v, error: %v"}`, id, err)))
 				return
 			}
-			log.Printf("Channel with %v created, ID is %v", address, id)
+			log.Printf("Channel with %s created, ID is %v", address, id)
 		}
 
 		//Get Lock to prevent Concurrency Issues
@@ -238,7 +248,7 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		lock.Unlock()
 
 		//Fire up Payments to the new channel
-		err = sendPayments(address, payAmount)
+		err = startPayments(address, payAmount)
 		if err != nil {
 			fmt.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -248,7 +258,7 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(200)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`"success":"Opened Channel successfully"`))
+		_, _ = w.Write([]byte(`"status":"Started Payments successfully"`))
 
 	case path.Join("/payments/stop", address):
 		lock.Lock()
@@ -259,7 +269,7 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"success":"stopped payments for your channel"}`))
+		_, _ = w.Write([]byte(`{"status":"Stopped Payments successfully"}`))
 
 	case path.Join("/payments/close", address):
 		err := closeChannel(address)
@@ -271,10 +281,11 @@ func handleChannelRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"success":"Closed Channel successfully"}`))
+		_, _ = w.Write([]byte(`{"status":"Closed Channel successfully"}`))
 	}
 }
 
+//handleDebug gives operator access to Raiden API for direct Calls
 func handleDebug(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
@@ -319,6 +330,7 @@ func handleDebug(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//createRaidenEndpoint starts the Raiden Binary after loading/generating the ETH Address
 func createRaidenEndpoint(ethNode string) {
 	ethAddress, err := raidenlib.LoadEthereumAddress(keystorePath, password, passwordFile)
 	if err != nil {
@@ -331,6 +343,7 @@ func createRaidenEndpoint(ethNode string) {
 	raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, ethNode, u.Host)
 }
 
+//setupWebserver configures the webserver with all necessary Handlers and Endpoints
 func setupWebserver(addr string) {
 	router := mux.NewRouter()
 	router.HandleFunc("/stop", stopPayments).Methods("GET")
