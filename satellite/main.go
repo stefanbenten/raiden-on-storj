@@ -65,7 +65,7 @@ func startPayments(receiver string, amount int64) (err error) {
 	go func() {
 		lock.Lock()
 		if closingchannels[receiver] != nil {
-			log.Printf("Payments to %v are already going out", receiver)
+			log.Printf("Payments to %s are already going out", receiver)
 			return
 		}
 		quit := make(chan struct{})
@@ -77,7 +77,7 @@ func startPayments(receiver string, amount int64) (err error) {
 		for active {
 			select {
 			case t := <-ticker.C:
-				log.Printf("Sending Payment to %v at: %s", receiver, t.Format("2006-01-02 15:04:05 +0800"))
+				log.Printf("Sending Payment to %s at: %s", receiver, t.Format("2006-01-02 15:04:05 +0800"))
 				statuscode, body, err := raidenlib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
 				if err != nil {
 					log.Println(err)
@@ -94,7 +94,7 @@ func startPayments(receiver string, amount int64) (err error) {
 					err = raiseChannelFunds(receiver, 5000000000)
 				}
 			case <-quit:
-				log.Printf("Stopped Payments to %v", receiver)
+				log.Printf("Stopped Payments to %s", receiver)
 				ticker.Stop()
 				active = false
 				return
@@ -114,7 +114,7 @@ func stopPayments(w http.ResponseWriter, r *http.Request) {
 				if c != nil {
 					close(*c)
 					closingchannels[address] = nil
-					log.Printf("Stopping Payments for: %v", address)
+					log.Printf("Stopping Payments for: %s", address)
 				}
 			}
 			lock.Unlock()
@@ -145,11 +145,11 @@ func getChannelInfo(receiver string) (info string, err error) {
 func setupChannel(receiver string, deposit int64) (channelID int64, err error) {
 	var jsonr map[string]interface{}
 
-	log.Printf("Setting up Channel for %v with balance of %v", receiver, deposit)
+	log.Printf("Setting up Channel for %s with balance of %v", receiver, deposit)
 
 	message := fmt.Sprintf(`{
-			"partner_address": "%v",
-			"token_address": "%v",
+			"partner_address": "%s",
+			"token_address": "%s",
 			"total_deposit": %v,
 			"settle_timeout": 500}`,
 		receiver,
@@ -161,13 +161,13 @@ func setupChannel(receiver string, deposit int64) (channelID int64, err error) {
 	if status == http.StatusCreated {
 		err = json.Unmarshal([]byte(body), &jsonr)
 		if jsonr["partner_address"] == receiver && err == nil {
-			log.Printf("Channel setup successfully for %v with balance of %v", receiver, deposit)
+			log.Printf("Channel setup successfully for %s with balance of %v", receiver, deposit)
 			channelID = int64(jsonr["channel_identifier"].(float64))
 			return
 		}
 	}
 	if err == nil {
-		err = errors.New(fmt.Sprintf("Error with Status %v : %v", status, body))
+		err = errors.New(fmt.Sprintf("Error with Status %v : %s", status, body))
 	}
 	return 0, err
 }
@@ -183,7 +183,7 @@ func raiseChannelFunds(receiver string, totalDeposit int64) (err error) {
 			return
 		}
 		if int64(jsonr["total_deposit"].(float64)) == totalDeposit {
-			log.Printf("Successfully raised channel funds to %v in channel with: %v", totalDeposit, receiver)
+			log.Printf("Successfully raised channel funds to %v in channel with: %s", totalDeposit, receiver)
 			log.Printf("Channel Balance is now: %v", int64(jsonr["balance"].(float64)))
 		}
 	}
@@ -325,7 +325,7 @@ func handleDebug(w http.ResponseWriter, r *http.Request) {
 			}
 			w.WriteHeader(200)
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(fmt.Sprintf("Status: %v, Body: %v", status, body)))
+			_, _ = w.Write([]byte(fmt.Sprintf("Status: %v, Body: %s", status, body)))
 		}
 	}
 }
@@ -337,7 +337,7 @@ func createRaidenEndpoint(ethNode string) {
 		log.Println(err)
 		ethAddress = raidenlib.CreateEthereumAddress(keystorePath, password, passwordFile)
 	}
-	log.Printf("Loaded Account: %v successfully", ethAddress)
+	log.Printf("Loaded Account: %s successfully", ethAddress)
 
 	u, _ := url.Parse(raidenEndpoint)
 	raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, ethNode, u.Host)
