@@ -117,6 +117,9 @@ func SendRequest(method string, url string, message string, contenttype string) 
 	return
 }
 
+/*CreateEthereumAddress is creating an Ethereum Wallet KeyStore file at keystorepath encrypted by password,
+saves the password in passwordFileName and returns it's address as string
+*/
 func CreateEthereumAddress(keystorePath string, password string, passwordFileName string) (address string) {
 
 	ks := keystore.NewKeyStore(keystorePath, keystore.StandardScryptN, keystore.StandardScryptP)
@@ -141,7 +144,8 @@ func CreateEthereumAddress(keystorePath string, password string, passwordFileNam
 	return account.Address.Hex()
 }
 
-func LoadEthereumAddress(keystorePath string, password string, passwordFileName string) (address string, err error) {
+//LoadEthereumAdress is trying to load the Ethereum Address from the KeyStore file in keystorepath
+func LoadEthereumAddress(keystorePath string, passwordFileName string) (address string, err error) {
 
 	files, err := ioutil.ReadDir(keystorePath)
 	if err != nil {
@@ -160,7 +164,6 @@ func LoadEthereumAddress(keystorePath string, password string, passwordFileName 
 	}
 	//Create Keystore for the account
 	ks := keystore.NewKeyStore(os.TempDir(), keystore.StandardScryptN, keystore.StandardScryptP)
-
 	//Get Account
 	file := filepath.Join(keystorePath, files[0].Name())
 	jsonBytes, err := ioutil.ReadFile(file)
@@ -168,7 +171,7 @@ func LoadEthereumAddress(keystorePath string, password string, passwordFileName 
 		return "", err
 	}
 	//Import keystone file into KeyStore
-	account, err := ks.Import(jsonBytes, string(pass), password)
+	account, err := ks.Import(jsonBytes, string(pass), string(pass))
 	if err != nil {
 		return "", err
 	}
