@@ -180,7 +180,7 @@ func FetchRaidenBinary(version string) (err error) {
 		return err
 	}
 	//Rename The Binary
-	os.Rename(filepath.Join("./", raidenbin), "./raiden-binary")
+	os.Rename(filepath.Join("./", filenames[0]), "./raiden-binary")
 
 	log.Println("Fetched Raiden Binary successfully")
 	return nil
