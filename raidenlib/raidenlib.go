@@ -163,7 +163,6 @@ func FetchRaidenBinary(version string) (err error) {
 	log.Println("Fetching Binary from: ", raidenurl)
 	downloadFile(raidenurl, filepath.Join(os.TempDir(), raidenbin))
 
-	log.Println(filepath.Ext(raidenbin))
 	//Extract File depending on the type
 	switch filepath.Ext(kernel) {
 	case ".zip":
@@ -178,7 +177,12 @@ func FetchRaidenBinary(version string) (err error) {
 		return err
 	}
 	//Rename The Binary
-	os.Rename(filepath.Join("./", filenames[0]), "./raiden-binary")
+	log.Printf("Renaming: %s to: %s", filepath.Join("./", filenames[0]), "./raiden-binary")
+	err = os.Rename(filepath.Join("./", filenames[0]), "./raiden-binary")
+	if err != nil {
+		log.Println("Fetched Raiden Binary not successfully")
+		return err
+	}
 
 	log.Println("Fetched Raiden Binary successfully")
 	return nil
