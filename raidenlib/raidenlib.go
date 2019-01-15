@@ -179,6 +179,8 @@ func FetchRaidenBinary(version string) (err error) {
 	//Rename The Binary
 	log.Printf("Renaming: %s to: %s", filepath.Join("./", filenames[0]), "./raiden-binary")
 	err = os.Rename(filepath.Join("./", filenames[0]), "./raiden-binary")
+	os.Chmod("./raiden-binary", 755)
+
 	if err != nil {
 		log.Println("Fetched Raiden Binary not successfully")
 		return err
