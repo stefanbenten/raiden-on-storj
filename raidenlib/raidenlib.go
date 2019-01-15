@@ -121,29 +121,29 @@ func untar(file string, dest string) (filenames []string, err error) {
 		}
 
 		if err != nil {
-			return
+			return filenames, err
 		}
 
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if err := os.Mkdir(header.Name, 0755); err != nil {
-				return
+				return filenames, err
 			}
 		case tar.TypeReg:
 			outFile, err := os.Create(header.Name)
 			filenames = append(filenames, header.Name)
 			if err != nil {
-				return
+				return filenames, err
 			}
 			defer outFile.Close()
 			if _, err := io.Copy(outFile, tarReader); err != nil {
-				return
+				return filenames, err
 			}
 		default:
-			return
+			return filenames, err
 		}
 	}
-	return
+	return filenames, err
 }
 
 func FetchRaidenBinary(version string) (err error) {
