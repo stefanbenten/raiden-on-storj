@@ -1,9 +1,13 @@
 package raidenlib
 
 import (
+	"archive/tar"
+	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -11,23 +15,172 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 )
 
-func FetchRaidenBinary() {
-	command := exec.Command("sh", "../install.sh", runtime.GOOS)
-	var out bytes.Buffer
-	command.Stdout = &out
-	//Start command and wait for the result
-	err := command.Run()
+func downloadFile(url string, filepath string) error {
+
+	// Create the file
+	out, err := os.Create(filepath)
 	if err != nil {
-		//If unable to fetch Raiden Binary quit
-		log.Fatalln(err)
+		return err
+	}
+	defer out.Close()
+
+	// Get the data
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
 	}
 
+	return nil
+}
+
+func unzip(file string, dest string) (filenames []string, err error) {
+
+	r, err := zip.OpenReader(file)
+
+	if err != nil {
+		return filenames, err
+	}
+	defer r.Close()
+
+	for _, f := range r.File {
+
+		rc, err := f.Open()
+		if err != nil {
+			return filenames, err
+		}
+		defer rc.Close()
+
+		// Store filename/path for returning and using later on
+		fpath := filepath.Join(dest, f.Name)
+
+		if !strings.HasPrefix(fpath, filepath.Clean(dest)+string(os.PathSeparator)) {
+			return filenames, fmt.Errorf("%s: illegal file path", fpath)
+		}
+
+		filenames = append(filenames, fpath)
+
+		if f.FileInfo().IsDir() {
+
+			// Make Folder
+			os.MkdirAll(fpath, os.ModePerm)
+
+		} else {
+
+			// Make File
+			if err = os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
+				return filenames, err
+			}
+
+			outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			if err != nil {
+				return filenames, err
+			}
+
+			_, err = io.Copy(outFile, rc)
+
+			outFile.Close()
+
+			if err != nil {
+				return filenames, err
+			}
+
+		}
+	}
+	return filenames, nil
+}
+
+func untar(file string, dest string) (filenames []string, err error) {
+
+	gzipStream, err := os.Open(file)
+
+	uncompressedStream, err := gzip.NewReader(gzipStream)
+	if err != nil {
+		return nil, err
+	}
+
+	tarReader := tar.NewReader(uncompressedStream)
+
+	for true {
+		header, err := tarReader.Next()
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.Mkdir(header.Name, 0755); err != nil {
+				return
+			}
+		case tar.TypeReg:
+			outFile, err := os.Create(header.Name)
+			filenames = append(filenames, header.Name)
+			if err != nil {
+				return
+			}
+			defer outFile.Close()
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				return
+			}
+		default:
+			return
+		}
+	}
+	return
+}
+
+func FetchRaidenBinary(version string) (err error) {
+	var filenames []string
+
+	kernel := ""
+	switch runtime.GOOS {
+	case "windows":
+		//Return as we dont support windows yet..
+		return errors.New("unsupported OS")
+	case "darwin":
+		kernel = "macOS.zip"
+	default:
+		kernel = "linux.tar.gz"
+	}
+	//Construct download URI and filename
+	raidenbin := fmt.Sprintf("%s-%s-%s", "raiden", version, kernel)
+	raidenurl := fmt.Sprintf("https://raiden-nightlies.ams3.digitaloceanspaces.com/%s", raidenbin)
+
+	downloadFile(raidenurl, filepath.Join(os.TempDir(), raidenbin))
+
+	//Extract File depending on the type
+	switch filepath.Ext(kernel) {
+	case ".zip":
+		filenames, err = unzip(filepath.Join(os.TempDir(), raidenbin), "./")
+	case ".tar.gz":
+		filenames, err = untar(filepath.Join(os.TempDir(), raidenbin), "./")
+	}
+	if err != nil {
+		log.Println("Fetched Raiden Binary not successfully")
+		return err
+	}
+	//Rename The Binary
+	os.Rename(filepath.Join("./", filenames[0]), "./raiden-binary")
+
 	log.Println("Fetched Raiden Binary successfully")
+	return nil
 }
 
 func StartRaidenBinary(binarypath string, keystorePath string, passwordFile string, address string, ethEndpoint string, listenAddr string) (pid int) {
@@ -38,7 +191,7 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 	exists, err := os.Stat(binarypath)
 	if err != nil || exists.Name() != "raiden-binary" {
 		log.Println("Binary not found, fetching from Repo")
-		FetchRaidenBinary()
+		FetchRaidenBinary("v0.19.0")
 	}
 
 	command := exec.Command(binarypath,

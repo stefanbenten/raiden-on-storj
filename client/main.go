@@ -38,7 +38,7 @@ func prepareETHAddress() {
 	var err error
 	//Fetch or Generate Ethereum address
 	if ethAddress == "" {
-		ethAddress, err = raidenlib.LoadEthereumAddress(keystorePath, password, passwordFile)
+		ethAddress, err = raidenlib.LoadEthereumAddress(keystorePath, passwordFile)
 		if err != nil {
 			log.Println(err)
 			log.Println("Generating new Address..")
