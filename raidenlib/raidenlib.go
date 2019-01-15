@@ -165,12 +165,13 @@ func FetchRaidenBinary(version string) (err error) {
 	log.Println("Fetching Binary from: ", raidenurl)
 	downloadFile(raidenurl, filepath.Join(os.TempDir(), raidenbin))
 
+	log.Println(filepath.Ext(raidenbin))
 	//Extract File depending on the type
 	switch filepath.Ext(kernel) {
-	case ".zip":
+	case "zip":
 		log.Println("Unzipping")
 		filenames, err = unzip(filepath.Join(os.TempDir(), raidenbin), "./")
-	case ".tar.gz":
+	case "tar.gz":
 		log.Println("Untaring")
 		filenames, err = untar(filepath.Join(os.TempDir(), raidenbin), "./")
 	}
