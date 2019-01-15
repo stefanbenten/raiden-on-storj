@@ -193,7 +193,11 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 	exists, err := os.Stat(binarypath)
 	if err != nil || exists.Name() != "raiden-binary" {
 		log.Println("Binary not found, fetching from Repo")
-		FetchRaidenBinary("v0.19.0")
+		err = FetchRaidenBinary("v0.19.0")
+		if err != nil {
+			log.Println(err)
+			return
+		}
 	}
 
 	command := exec.Command(binarypath,
