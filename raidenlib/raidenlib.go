@@ -15,7 +15,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -64,11 +63,7 @@ func unzip(file string, dest string) (filenames []string, err error) {
 		defer rc.Close()
 
 		// Store filename/path for returning and using later on
-		fpath := filepath.Join(dest, f.Name)
-
-		if !strings.HasPrefix(fpath, filepath.Clean(dest)+string(os.PathSeparator)) {
-			return filenames, fmt.Errorf("%s: illegal file path", fpath)
-		}
+		fpath := filepath.Clean(filepath.Join(dest, f.Name))
 
 		filenames = append(filenames, fpath)
 
@@ -151,17 +146,20 @@ func FetchRaidenBinary(version string) (err error) {
 
 	kernel := ""
 	switch runtime.GOOS {
-	case "windows":
-		//Return as we dont support windows yet..
+	default:
+		//return, as Raiden doesnt support it yet..
 		return errors.New("unsupported OS")
 	case "darwin":
 		kernel = "macOS.zip"
-	default:
+	case "linux":
+		kernel = "linux.tar.gz"
+	case "freebsd":
 		kernel = "linux.tar.gz"
 	}
 	//Construct download URI and filename
 	raidenbin := fmt.Sprintf("%s-%s-%s", "raiden", version, kernel)
 	raidenurl := fmt.Sprintf("https://raiden-nightlies.ams3.digitaloceanspaces.com/%s", raidenbin)
+
 	log.Println("Fetching Binary from: ", raidenurl)
 	downloadFile(raidenurl, filepath.Join(os.TempDir(), raidenbin))
 
