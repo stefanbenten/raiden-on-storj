@@ -162,14 +162,16 @@ func FetchRaidenBinary(version string) (err error) {
 	//Construct download URI and filename
 	raidenbin := fmt.Sprintf("%s-%s-%s", "raiden", version, kernel)
 	raidenurl := fmt.Sprintf("https://raiden-nightlies.ams3.digitaloceanspaces.com/%s", raidenbin)
-
+	log.Println("Fetching Binary from: ", raidenurl)
 	downloadFile(raidenurl, filepath.Join(os.TempDir(), raidenbin))
 
 	//Extract File depending on the type
 	switch filepath.Ext(kernel) {
 	case ".zip":
+		log.Println("Unzipping")
 		filenames, err = unzip(filepath.Join(os.TempDir(), raidenbin), "./")
 	case ".tar.gz":
+		log.Println("Untaring")
 		filenames, err = untar(filepath.Join(os.TempDir(), raidenbin), "./")
 	}
 	if err != nil {

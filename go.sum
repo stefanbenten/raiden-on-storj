@@ -67,6 +67,8 @@ github.com/stefanbenten/raiden-on-storj/raidenlib v0.0.0-20190114184829-0143488d
 github.com/stefanbenten/raiden-on-storj/raidenlib v0.0.0-20190114184829-0143488d8887/go.mod h1:IJYmGYJZWwBhlex77HvY4p3xIU1/7L/wKDFYfvBsWH4=
 github.com/stefanbenten/raiden-on-storj/raidenlib v0.0.0-20190115170059-a388b34ef7da h1:2SCVLza9ylgIdZc1d+7KpwrY9lpTMbgOjzw+25yUljk=
 github.com/stefanbenten/raiden-on-storj/raidenlib v0.0.0-20190115170059-a388b34ef7da/go.mod h1:IJYmGYJZWwBhlex77HvY4p3xIU1/7L/wKDFYfvBsWH4=
+github.com/stefanbenten/raiden-on-storj/raidenlib v0.0.0-20190115170544-6042e96888bb h1:0GL8yIruuRrHtfJS3rLYLwxNxV/3BB8+D98v0HWuL+c=
+github.com/stefanbenten/raiden-on-storj/raidenlib v0.0.0-20190115170544-6042e96888bb/go.mod h1:IJYmGYJZWwBhlex77HvY4p3xIU1/7L/wKDFYfvBsWH4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0Q=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
