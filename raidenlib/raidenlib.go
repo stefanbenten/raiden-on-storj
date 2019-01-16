@@ -60,6 +60,7 @@ func unzip(file string, dest string) (filenames []string, err error) {
 		if err != nil {
 			return filenames, err
 		}
+
 		defer rc.Close()
 
 		// Store filename/path for returning and using later on
@@ -125,7 +126,7 @@ func untar(file string, dest string) (filenames []string, err error) {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.Mkdir(header.Name, 0755); err != nil {
+			if err := os.Mkdir(filepath.Join(dest, header.Name), 0755); err != nil {
 				return filenames, err
 			}
 		case tar.TypeReg:
