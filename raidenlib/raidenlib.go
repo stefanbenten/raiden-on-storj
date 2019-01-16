@@ -63,7 +63,7 @@ func unzip(file string, dest string) (filenames []string, err error) {
 		defer rc.Close()
 
 		// Store filename/path for returning and using later on
-		fpath := filepath.Clean(filepath.Join(dest, f.Name))
+		fpath := filepath.Join(dest, filepath.Clean(f.Name))
 
 		filenames = append(filenames, fpath)
 
@@ -94,6 +94,10 @@ func unzip(file string, dest string) (filenames []string, err error) {
 
 		}
 	}
+
+	//Delete File
+	err = os.Remove(file)
+
 	return filenames, nil
 }
 
@@ -138,6 +142,10 @@ func untar(file string, dest string) (filenames []string, err error) {
 			return filenames, err
 		}
 	}
+
+	//Remove File
+	err = os.Remove(file)
+
 	return filenames, err
 }
 
@@ -161,16 +169,18 @@ func FetchRaidenBinary(version string) (err error) {
 	raidenurl := fmt.Sprintf("https://raiden-nightlies.ams3.digitaloceanspaces.com/%s", raidenbin)
 
 	log.Println("Fetching Binary from: ", raidenurl)
-	downloadFile(raidenurl, filepath.Join(os.TempDir(), raidenbin))
+
+	tempDir := os.TempDir()
+	downloadFile(raidenurl, filepath.Join(tempDir, raidenbin))
 
 	//Extract File depending on the type
 	switch filepath.Ext(kernel) {
 	case ".zip":
 		log.Println("Unzipping")
-		filenames, err = unzip(filepath.Join(os.TempDir(), raidenbin), "./")
+		filenames, err = unzip(filepath.Join(tempDir, raidenbin), "./")
 	case ".gz":
 		log.Println("Untaring")
-		filenames, err = untar(filepath.Join(os.TempDir(), raidenbin), "./")
+		filenames, err = untar(filepath.Join(tempDir, raidenbin), "./")
 
 	}
 	if err != nil {
