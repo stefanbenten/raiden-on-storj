@@ -1,9 +1,13 @@
 package raidenlib
 
 import (
+	"archive/tar"
+	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -16,18 +20,173 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 )
 
-func FetchRaidenBinary() {
-	command := exec.Command("sh", "../install.sh", runtime.GOOS)
-	var out bytes.Buffer
-	command.Stdout = &out
-	//Start command and wait for the result
-	err := command.Run()
+func downloadFile(url string, filepath string) error {
+
+	// Create the file
+	out, err := os.Create(filepath)
 	if err != nil {
-		//If unable to fetch Raiden Binary quit
-		log.Fatalln(err)
+		return err
+	}
+	defer out.Close()
+
+	// Get the data
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func unzip(file string, dest string) (filenames []string, err error) {
+
+	r, err := zip.OpenReader(file)
+
+	if err != nil {
+		return filenames, err
+	}
+	defer r.Close()
+
+	for _, f := range r.File {
+
+		rc, err := f.Open()
+		if err != nil {
+			return filenames, err
+		}
+		defer rc.Close()
+
+		// Store filename/path for returning and using later on
+		fpath := filepath.Clean(filepath.Join(dest, f.Name))
+
+		filenames = append(filenames, fpath)
+
+		if f.FileInfo().IsDir() {
+
+			// Make Folder
+			os.MkdirAll(fpath, os.ModePerm)
+
+		} else {
+
+			// Make File
+			if err = os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
+				return filenames, err
+			}
+
+			outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			if err != nil {
+				return filenames, err
+			}
+
+			_, err = io.Copy(outFile, rc)
+
+			outFile.Close()
+
+			if err != nil {
+				return filenames, err
+			}
+
+		}
+	}
+	return filenames, nil
+}
+
+func untar(file string, dest string) (filenames []string, err error) {
+
+	gzipStream, err := os.Open(file)
+
+	uncompressedStream, err := gzip.NewReader(gzipStream)
+	if err != nil {
+		return nil, err
+	}
+
+	tarReader := tar.NewReader(uncompressedStream)
+
+	for true {
+		header, err := tarReader.Next()
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return filenames, err
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.Mkdir(header.Name, 0755); err != nil {
+				return filenames, err
+			}
+		case tar.TypeReg:
+			outFile, err := os.OpenFile(header.Name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(header.Mode))
+			filenames = append(filenames, header.Name)
+			if err != nil {
+				return filenames, err
+			}
+			defer outFile.Close()
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				return filenames, err
+			}
+		default:
+			return filenames, err
+		}
+	}
+	return filenames, err
+}
+
+func FetchRaidenBinary(version string) (err error) {
+	var filenames []string
+
+	kernel := ""
+	switch runtime.GOOS {
+	default:
+		//return, as Raiden doesnt support it yet..
+		return errors.New("unsupported OS")
+	case "darwin":
+		kernel = "macOS.zip"
+	case "linux":
+		kernel = "linux.tar.gz"
+	case "freebsd":
+		kernel = "linux.tar.gz"
+	}
+	//Construct download URI and filename
+	raidenbin := fmt.Sprintf("%s-%s-%s", "raiden", version, kernel)
+	raidenurl := fmt.Sprintf("https://raiden-nightlies.ams3.digitaloceanspaces.com/%s", raidenbin)
+
+	log.Println("Fetching Binary from: ", raidenurl)
+	downloadFile(raidenurl, filepath.Join(os.TempDir(), raidenbin))
+
+	//Extract File depending on the type
+	switch filepath.Ext(kernel) {
+	case ".zip":
+		log.Println("Unzipping")
+		filenames, err = unzip(filepath.Join(os.TempDir(), raidenbin), "./")
+	case ".gz":
+		log.Println("Untaring")
+		filenames, err = untar(filepath.Join(os.TempDir(), raidenbin), "./")
+
+	}
+	if err != nil {
+		log.Println("Fetched Raiden Binary not successfully")
+		return err
+	}
+	//Rename The Binary
+	log.Printf("Renaming: %s to: %s", filepath.Join("./", filenames[0]), "./raiden-binary")
+	err = os.Rename(filepath.Join("./", filenames[0]), "./raiden-binary")
+	if err != nil {
+		log.Println("Fetched Raiden Binary not successfully")
+		return err
 	}
 
 	log.Println("Fetched Raiden Binary successfully")
+	return nil
 }
 
 func StartRaidenBinary(binarypath string, keystorePath string, passwordFile string, address string, ethEndpoint string, listenAddr string) (pid int) {
@@ -38,7 +197,11 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 	exists, err := os.Stat(binarypath)
 	if err != nil || exists.Name() != "raiden-binary" {
 		log.Println("Binary not found, fetching from Repo")
-		FetchRaidenBinary()
+		err = FetchRaidenBinary("v0.19.0")
+		if err != nil {
+			log.Println(err)
+			return
+		}
 	}
 
 	command := exec.Command(binarypath,
@@ -53,7 +216,6 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 		"--rpccorsdomain", "all",
 		"--accept-disclaimer",
 	)
-
 	var out, errs bytes.Buffer
 	command.Stdout = &out
 	command.Stderr = &errs
@@ -117,6 +279,9 @@ func SendRequest(method string, url string, message string, contenttype string) 
 	return
 }
 
+/*CreateEthereumAddress is creating an Ethereum Wallet KeyStore file at keystorepath encrypted by password,
+saves the password in passwordFileName and returns it's address as string
+*/
 func CreateEthereumAddress(keystorePath string, password string, passwordFileName string) (address string) {
 
 	ks := keystore.NewKeyStore(keystorePath, keystore.StandardScryptN, keystore.StandardScryptP)
@@ -141,7 +306,8 @@ func CreateEthereumAddress(keystorePath string, password string, passwordFileNam
 	return account.Address.Hex()
 }
 
-func LoadEthereumAddress(keystorePath string, password string, passwordFileName string) (address string, err error) {
+//LoadEthereumAdress is trying to load the Ethereum Address from the KeyStore file in keystorepath
+func LoadEthereumAddress(keystorePath string, passwordFileName string) (address string, err error) {
 
 	files, err := ioutil.ReadDir(keystorePath)
 	if err != nil {
@@ -160,7 +326,6 @@ func LoadEthereumAddress(keystorePath string, password string, passwordFileName 
 	}
 	//Create Keystore for the account
 	ks := keystore.NewKeyStore(os.TempDir(), keystore.StandardScryptN, keystore.StandardScryptP)
-
 	//Get Account
 	file := filepath.Join(keystorePath, files[0].Name())
 	jsonBytes, err := ioutil.ReadFile(file)
@@ -168,7 +333,7 @@ func LoadEthereumAddress(keystorePath string, password string, passwordFileName 
 		return "", err
 	}
 	//Import keystone file into KeyStore
-	account, err := ks.Import(jsonBytes, string(pass), password)
+	account, err := ks.Import(jsonBytes, string(pass), string(pass))
 	if err != nil {
 		return "", err
 	}

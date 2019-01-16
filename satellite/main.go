@@ -24,13 +24,15 @@ const keystorePath = "./keystore"
 const password = "superStr0ng"
 const passwordFile = "password.txt"
 
-var accepting = true
-var channels = map[string]int64{}
-var closingchannels = map[string]*chan struct{}{}
-var interval = 2 * time.Second
-var deposit int64 = 5000000000
-var payAmount int64 = 1337
-var lock *sync.Mutex
+var (
+	accepting             = true
+	channels              = map[string]int64{}
+	closingchannels       = map[string]*chan struct{}{}
+	interval              = 2 * time.Second
+	deposit         int64 = 5000000000
+	payAmount       int64 = 1337
+	lock            *sync.Mutex
+)
 
 //checkChannelID does a lookup for the ChannelID to receiver and returns ID or error when not existing
 func checkChannelID(receiver string) (id int64, err error) {
@@ -62,7 +64,7 @@ func checkChannelID(receiver string) (id int64, err error) {
 
 //startPayments starts a go routine which sends every interval the amount to receiver
 func startPayments(receiver string, amount int64) (err error) {
-	go func() {
+	go func() (err error) {
 		lock.Lock()
 		if closingchannels[receiver] != nil {
 			log.Printf("Payments to %s are already going out", receiver)
@@ -80,26 +82,26 @@ func startPayments(receiver string, amount int64) (err error) {
 				log.Printf("Sending Payment to %s at: %s", receiver, t.Format("2006-01-02 15:04:05 +0800"))
 				statuscode, body, err := raidenlib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
 				if err != nil {
-					log.Println(err)
-					return
+					return err
 				}
 				if statuscode == http.StatusPaymentRequired {
 					var jsonr map[string]interface{}
 					err = json.Unmarshal([]byte(body), &jsonr)
 					if err != nil {
-						return
+						return err
 					}
+					//TODO: Test Missing Channel Funds
 					log.Println(body)
 					//log.Printf("Channel Balance of ID %v insufficient (is: %v, need: %v), refunding..", channels[receiver], jsonr["balance"], amount)
-					err = raiseChannelFunds(receiver, 5000000000)
+					err = raiseChannelFunds(receiver, deposit)
 				}
 			case <-quit:
 				log.Printf("Stopped Payments to %s", receiver)
 				ticker.Stop()
 				active = false
-				return
 			}
 		}
+		return nil
 	}()
 	return
 }
@@ -129,8 +131,8 @@ func stopPayments(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//getChannelInfo returns the Raiden Channel Information as json encoded string
-func getChannelInfo(receiver string) (info string, err error) {
+//getChannelInfo returns the Raiden Channel Information (body) as json encoded string
+func getChannelInfo(receiver string) (body string, err error) {
 	status, body, err := raidenlib.SendRequest("GET", raidenEndpoint+path.Join("channels", tokenAddress, receiver), "", "application/json")
 	if status == http.StatusOK {
 		return body, nil
@@ -173,8 +175,16 @@ func setupChannel(receiver string, deposit int64) (channelID int64, err error) {
 }
 
 //raiseChannelFunds increases the current channel deposit with receiver to totalDeposit
-func raiseChannelFunds(receiver string, totalDeposit int64) (err error) {
+func raiseChannelFunds(receiver string, deposit int64) (err error) {
 	var jsonr map[string]interface{}
+
+	channelinfo, err := getChannelInfo(receiver)
+	err = json.Unmarshal([]byte(channelinfo), &jsonr)
+	if err != nil {
+		return
+	}
+	totalDeposit := int64(jsonr["total_deposit"].(float64)) + deposit
+
 	message := fmt.Sprintf(`{"total_deposit": "%v"}`, totalDeposit)
 	status, body, err := raidenlib.SendRequest("PATCH", raidenEndpoint+path.Join("channels", tokenAddress, receiver), message, "application/json")
 	if status == http.StatusOK {
@@ -183,8 +193,8 @@ func raiseChannelFunds(receiver string, totalDeposit int64) (err error) {
 			return
 		}
 		if int64(jsonr["total_deposit"].(float64)) == totalDeposit {
-			log.Printf("Successfully raised channel funds to %v in channel with: %s", totalDeposit, receiver)
-			log.Printf("Channel Balance is now: %v", int64(jsonr["balance"].(float64)))
+			log.Printf("Successfully raised balance by %v in channel with: %s", deposit, receiver)
+			log.Printf("- Channel Balance is now: %v", int64(jsonr["balance"].(float64)))
 		}
 	}
 	return
