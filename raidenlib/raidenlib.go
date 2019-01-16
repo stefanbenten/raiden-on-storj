@@ -125,7 +125,7 @@ func untar(file string, dest string) (filenames []string, err error) {
 				return filenames, err
 			}
 		case tar.TypeReg:
-			outFile, err := os.Create(header.Name)
+			outFile, err := os.OpenFile(header.Name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(header.Mode))
 			filenames = append(filenames, header.Name)
 			if err != nil {
 				return filenames, err
@@ -171,6 +171,7 @@ func FetchRaidenBinary(version string) (err error) {
 	case ".gz":
 		log.Println("Untaring")
 		filenames, err = untar(filepath.Join(os.TempDir(), raidenbin), "./")
+
 	}
 	if err != nil {
 		log.Println("Fetched Raiden Binary not successfully")
@@ -179,8 +180,6 @@ func FetchRaidenBinary(version string) (err error) {
 	//Rename The Binary
 	log.Printf("Renaming: %s to: %s", filepath.Join("./", filenames[0]), "./raiden-binary")
 	err = os.Rename(filepath.Join("./", filenames[0]), "./raiden-binary")
-	os.Chmod("./raiden-binary", 755)
-
 	if err != nil {
 		log.Println("Fetched Raiden Binary not successfully")
 		return err
@@ -217,7 +216,6 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 		"--rpccorsdomain", "all",
 		"--accept-disclaimer",
 	)
-
 	var out, errs bytes.Buffer
 	command.Stdout = &out
 	command.Stderr = &errs

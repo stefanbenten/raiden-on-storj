@@ -8,7 +8,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path"
+	"syscall"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/browser"
@@ -20,6 +22,7 @@ var passwordFile = "password.txt"
 var keystorePath = "./keystore/"
 var ethAddress = ""
 var raidenEndpoint = "0.0.0.0:7709"
+var satellite = "http://home.stefan-benten.de:7700/payments/"
 var raidenPID = 0
 var active = false
 
@@ -63,9 +66,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
         			<h3>using password: {{.Password}}</h3>
         			<form action="/" method="POST">
             			Satellite Payment Endpoint:<br>
-            			<input name="endpoint" type="text" size=40 value="http://home.stefan-benten.de:7700/payments/"><br>
+            			<input name="endpoint" type="text" size=40 value="http://home.stefan-benten.de:7700/payments/" {{if .Active}}disabled{{end}}><br>
             			ETH Node Address:<br>
-            			<input name="ethnode" type="text" size=40 value="http://home.stefan-benten.de:7701/"><br>
+            			<input name="ethnode" type="text" size=40 value="http://home.stefan-benten.de:7701/" {{if .Active}}disabled{{end}}><br>
             			<hr>
 						<button name="function" value="start" type="submit" {{if .Active}}disabled{{end}}>Start Payments!</button>
 						<button name="function" value="stop" type="submit" {{if not .Active}}disabled{{end}}>Stop Payments!</button>
@@ -113,16 +116,17 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	case "POST":
 		{
-			endpoint := r.FormValue("endpoint")
+			satellite = r.FormValue("endpoint")
 			ethnode := r.FormValue("ethnode")
 			function := r.FormValue("function")
+
 			if function == "start" {
 				active = true
 			} else {
 				active = false
 			}
 
-			if endpoint == "" || ethnode == "" {
+			if satellite == "" || ethnode == "" {
 				w.WriteHeader(500)
 				w.Header().Set("Content-Type", "application/json")
 				_, _ = w.Write([]byte("Not all parameters provided, please check your request"))
@@ -142,7 +146,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			//Send Request to Satellite for interaction
-			status, body, err := raidenlib.SendRequest("GET", endpoint+path.Join(function, ethAddress), "", "application/json")
+			status, body, err := raidenlib.SendRequest("GET", satellite+path.Join(function, ethAddress), "", "application/json")
 			if err != nil {
 				w.WriteHeader(500)
 				w.Header().Set("Content-Type", "application/json")
@@ -167,7 +171,20 @@ func setupWebserver(addr string) {
 	}
 }
 
+func debugHandler() {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGQUIT)
+	for range sigs {
+		status, _, err := raidenlib.SendRequest("GET", satellite+path.Join("stop", ethAddress), "", "application/json")
+		if err != nil || status != http.StatusOK {
+			log.Println(status, err)
+		}
+	}
+}
+
 func main() {
+	go debugHandler()
+
 	skip := flag.Bool("direct", false, "Direct Payment Start with default Endpoints")
 	override := flag.Bool("override", false, "Delete existing KeyStore and generate a new one")
 	endpoint := flag.String("endpoint", "http://home.stefan-benten.de:7700/payments/", "Satellite Payment Endpoint")
