@@ -342,7 +342,7 @@ func handleDebug(w http.ResponseWriter, r *http.Request) {
 
 //createRaidenEndpoint starts the Raiden Binary after loading/generating the ETH Address
 func createRaidenEndpoint(ethNode string) {
-	ethAddress, err := raidenlib.LoadEthereumAddress(keystorePath, password, passwordFile)
+	ethAddress, err := raidenlib.LoadEthereumAddress(keystorePath, passwordFile)
 	if err != nil {
 		log.Println(err)
 		ethAddress = raidenlib.CreateEthereumAddress(keystorePath, password, passwordFile)
