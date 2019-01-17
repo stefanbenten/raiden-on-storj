@@ -66,9 +66,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
         			<h3>using password: {{.Password}}</h3>
         			<form action="/" method="POST">
             			Satellite Payment Endpoint:<br>
-            			<input name="endpoint" type="text" size=40 value="http://home.stefan-benten.de:7700/payments/" {{if .Active}}disabled{{end}}><br>
+            			<input name="endpoint" type="text" size=40 value="http://home.stefan-benten.de:7700/payments/" {{if .Active}}readonly="readonly"{{end}}><br>
             			ETH Node Address:<br>
-            			<input name="ethnode" type="text" size=40 value="http://home.stefan-benten.de:7701/" {{if .Active}}disabled{{end}}><br>
+            			<input name="ethnode" type="text" size=40 value="http://home.stefan-benten.de:7701/" {{if .Active}}readonly="readonly"{{end}}><br>
             			<hr>
 						<button name="function" value="start" type="submit" {{if .Active}}disabled{{end}}>Start Payments!</button>
 						<button name="function" value="stop" type="submit" {{if not .Active}}disabled{{end}}>Stop Payments!</button>
@@ -175,10 +175,12 @@ func debugHandler() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGQUIT)
 	for range sigs {
+		log.Println("Got SIGQUIT, stopping payments")
 		status, _, err := raidenlib.SendRequest("GET", satellite+path.Join("stop", ethAddress), "", "application/json")
 		if err != nil || status != http.StatusOK {
 			log.Println(status, err)
 		}
+		log.Println("Successfully executed channel request for payments: stop")
 	}
 }
 
