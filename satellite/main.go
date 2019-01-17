@@ -300,7 +300,25 @@ func handleDebug(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		{
-			t, err := template.ParseFiles("./index.html")
+			t, err := template.New("").Parse(`
+			<html>
+				<head>
+					<title>Debugging</title>
+				</head>
+				<body>
+					<form action="/debug" method="POST">
+						Method:<br>
+						<input name="method" type="text" size=10 value="GET"><br>
+						Endpoint:<br>
+						<input name="endpoint" type="text" size=100 value=""><br>
+						Message:<br>
+						<input name="message" type="text" size=100 value=""><br>
+						<hr>
+						<input type="submit" value="Send Request" />
+					</form>
+				</body>
+			</html>`,
+			)
 			if err != nil {
 				log.Println(err)
 				return
