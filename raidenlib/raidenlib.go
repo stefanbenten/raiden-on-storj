@@ -152,8 +152,12 @@ func untar(file string, dest string) (filenames []string, err error) {
 
 func FetchRaidenBinary(version string) (err error) {
 	var filenames []string
+	var kernel = ""
 
-	kernel := ""
+	if runtime.GOARCH != "amd64" {
+		return errors.New("unsupported architecture")
+	}
+
 	switch runtime.GOOS {
 	default:
 		//return, as Raiden doesnt support it yet..
