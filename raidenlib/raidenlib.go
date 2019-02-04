@@ -176,8 +176,11 @@ func FetchRaidenBinary(version string) (err error) {
 	log.Println("Fetching Binary from: ", raidenurl)
 
 	tempDir := os.TempDir()
-	downloadFile(raidenurl, filepath.Join(tempDir, raidenbin))
-
+	err = downloadFile(raidenurl, filepath.Join(tempDir, raidenbin))
+	if err != nil {
+		log.Println("Downloaded Raiden Binary not successfully")
+		return err
+	}
 	//Extract File depending on the type
 	switch filepath.Ext(kernel) {
 	case ".zip":
@@ -189,7 +192,7 @@ func FetchRaidenBinary(version string) (err error) {
 
 	}
 	if err != nil {
-		log.Println("Fetched Raiden Binary not successfully")
+		log.Println("Extracted Raiden Binary not successfully")
 		return err
 	}
 	//Rename The Binary
@@ -204,7 +207,7 @@ func FetchRaidenBinary(version string) (err error) {
 	return nil
 }
 
-func StartRaidenBinary(binarypath string, keystorePath string, passwordFile string, address string, ethEndpoint string, listenAddr string) (pid int) {
+func StartRaidenBinary(version string, binarypath string, keystorePath string, passwordFile string, address string, ethEndpoint string, listenAddr string) (pid int) {
 
 	log.Println(binarypath, keystorePath, passwordFile, address, ethEndpoint, listenAddr)
 	log.Printf("Starting Raiden Binary for Address: %v and endpoint: %v on listen Address: %v", address, ethEndpoint, listenAddr)
@@ -212,7 +215,7 @@ func StartRaidenBinary(binarypath string, keystorePath string, passwordFile stri
 	exists, err := os.Stat(binarypath)
 	if err != nil || exists.Name() != "raiden-binary" {
 		log.Println("Binary not found, fetching from Repo")
-		err = FetchRaidenBinary("v0.19.0")
+		err = FetchRaidenBinary(version)
 		if err != nil {
 			log.Println(err)
 			return

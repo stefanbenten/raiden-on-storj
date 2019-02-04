@@ -79,7 +79,7 @@ func startPayments(receiver string, amount int64) (err error) {
 		for active {
 			select {
 			case t := <-ticker.C:
-				log.Printf("Sending Payment to %s at: %s", receiver, t.Format("2006-01-02 15:04:05 +0800"))
+				log.Printf("Sending Payment to %s at: %s", receiver, t.Format("2000-01-01 00:00:01 +0100"))
 				statuscode, body, err := raidenlib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
 				if err != nil {
 					return err
@@ -368,7 +368,7 @@ func createRaidenEndpoint(ethNode string) {
 	log.Printf("Loaded Account: %s successfully", ethAddress)
 
 	u, _ := url.Parse(raidenEndpoint)
-	raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, ethNode, u.Host)
+	raidenlib.StartRaidenBinary("v0.100.1", "./raiden-binary", keystorePath, passwordFile, ethAddress, ethNode, u.Host)
 }
 
 //setupWebserver configures the webserver with all necessary Handlers and Endpoints

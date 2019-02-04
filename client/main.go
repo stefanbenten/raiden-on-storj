@@ -135,7 +135,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 			//Start Raiden Binary if necessary
 			if raidenPID == 0 {
-				raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, ethnode, raidenEndpoint)
+				raidenPID = raidenlib.StartRaidenBinary("v0.100.1", "./raiden-binary", keystorePath, passwordFile, ethAddress, ethnode, raidenEndpoint)
 				//if PID is still 0, there is an issue
 				if raidenPID == 0 {
 					log.Println("error: unable to start Raiden Binary")
