@@ -31,6 +31,7 @@ var (
 	interval              = 2 * time.Second
 	deposit         int64 = 5000000000
 	payAmount       int64 = 1337
+	version               = "v0.100.0"
 	lock            *sync.Mutex
 )
 
@@ -368,7 +369,7 @@ func createRaidenEndpoint(ethNode string) {
 	log.Printf("Loaded Account: %s successfully", ethAddress)
 
 	u, _ := url.Parse(raidenEndpoint)
-	raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, ethNode, u.Host)
+	raidenlib.StartRaidenBinary("./raiden-binary", version, keystorePath, passwordFile, ethAddress, ethNode, u.Host)
 }
 
 //setupWebserver configures the webserver with all necessary Handlers and Endpoints
@@ -388,8 +389,11 @@ func setupWebserver(addr string) {
 func main() {
 	tm := flag.Int("interval", 2000, "Interval for sending payments (microseconds)")
 	pm := flag.Int64("paymentvalue", 1337, "Amount to be sent per each payment")
+	ver := flag.String("version", "v0.100.0", "Raiden Binary Version")
 	flag.Parse()
 	payAmount = *pm
+	version = *ver
+
 	interval = time.Duration(*tm) * time.Millisecond
 	log.Printf("Setting Payment Interval to %v and payment amount to %v", interval, payAmount)
 

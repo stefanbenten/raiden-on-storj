@@ -22,6 +22,7 @@ var passwordFile = "password.txt"
 var keystorePath = "./keystore/"
 var ethAddress = ""
 var raidenEndpoint = "0.0.0.0:7709"
+var version = "v0.100.0"
 var satellite = "http://home.stefan-benten.de:7700/payments/"
 var raidenPID = 0
 var active = false
@@ -135,7 +136,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 			//Start Raiden Binary if necessary
 			if raidenPID == 0 {
-				raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", keystorePath, passwordFile, ethAddress, ethnode, raidenEndpoint)
+				raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", version, keystorePath, passwordFile, ethAddress, ethnode, raidenEndpoint)
 				//if PID is still 0, there is an issue
 				if raidenPID == 0 {
 					log.Println("error: unable to start Raiden Binary")
@@ -176,11 +177,7 @@ func debugHandler() {
 	signal.Notify(sigs, syscall.SIGQUIT)
 	for range sigs {
 		log.Println("Got SIGQUIT, stopping payments")
-		status, _, err := raidenlib.SendRequest("GET", satellite+path.Join("stop", ethAddress), "", "application/json")
-		if err != nil || status != http.StatusOK {
-			log.Println(status, err)
-		}
-		log.Println("Successfully executed channel request for payments: stop")
+		//TODO: Stop all payments before shutting down
 	}
 }
 
@@ -193,6 +190,7 @@ func main() {
 	ethnode := flag.String("ethnode", "http://home.stefan-benten.de:7701/", "Ethereum Node Endpoint")
 	listen := flag.String("listen", "0.0.0.0:7710", "Listen Address for Raiden Endpoint")
 	raiden := flag.String("listen-raiden", "0.0.0.0:7709", "Listen Address for Raiden Endpoint")
+	ver := flag.String("version", "v0.100.0", "Raiden Binary Version")
 	keystore := flag.String("keystore", "./keystore", "Keystore Path")
 	pw := flag.String("password", "superStr0ng", "Password used for Keystore encryption")
 	flag.Parse()
@@ -201,6 +199,7 @@ func main() {
 	raidenEndpoint = *raiden
 	keystorePath = *keystore
 	password = *pw
+	version = *ver
 
 	// if Override is requested, it deletes all existing keystore files
 	if *override {
@@ -217,7 +216,7 @@ func main() {
 	if *skip {
 		//Start Raiden Binary
 		log.Println("Skip Flag set, starting Raiden Binary..")
-		raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", *keystore, *pw, ethAddress, *ethnode, *raiden)
+		raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", version, *keystore, *pw, ethAddress, *ethnode, *raiden)
 		if raidenPID == 0 {
 			log.Fatalln("error: unable to start Raiden Binary")
 		}
