@@ -152,23 +152,32 @@ func untar(file string, dest string) (filenames []string, err error) {
 
 func FetchRaidenBinary(version string) (err error) {
 	var filenames []string
-	var kernel = ""
-
-	if !(runtime.GOARCH == "amd64" || runtime.GOARCH == "arm") {
-		return errors.New("unsupported architecture")
-	}
+	var kernel, goos, exten = "", "", ""
 
 	switch runtime.GOOS {
 	default:
 		//return, as Raiden doesnt support it yet..
 		return errors.New("unsupported OS")
 	case "darwin":
-		kernel = "macOS.zip"
+		goos = "macOS"
+		exten = ".zip"
 	case "linux":
-		kernel = "linux.tar.gz"
+		goos = "linux"
+		exten = ".tar.gz"
 	case "freebsd":
-		kernel = "linux.tar.gz"
+		goos = "linux"
+		exten = ".tar.gz"
 	}
+
+	switch runtime.GOARCH {
+	default:
+		return errors.New("unsupported architecture")
+	case "amd64":
+		kernel = fmt.Sprintf("%s-%s%s", goos, "x86_64", exten)
+	case "arm":
+		kernel = fmt.Sprintf("%s-%s%s", goos, "armv7l", exten)
+	}
+
 	//Construct download URI and filename
 	raidenbin := fmt.Sprintf("%s-%s-%s", "raiden", version, kernel)
 	raidenurl := fmt.Sprintf("https://raiden-nightlies.ams3.digitaloceanspaces.com/%s", raidenbin)
@@ -176,7 +185,10 @@ func FetchRaidenBinary(version string) (err error) {
 	log.Println("Fetching Binary from: ", raidenurl)
 
 	tempDir := os.TempDir()
-	downloadFile(raidenurl, filepath.Join(tempDir, raidenbin))
+	err = downloadFile(raidenurl, filepath.Join(tempDir, raidenbin))
+	if err != nil {
+		return err
+	}
 
 	//Extract File depending on the type
 	switch filepath.Ext(kernel) {
