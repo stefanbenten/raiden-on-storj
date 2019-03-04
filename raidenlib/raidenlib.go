@@ -206,7 +206,7 @@ func FetchRaidenBinary(version string) (err error) {
 
 func StartRaidenBinary(binarypath string, version string, keystorePath string, passwordFile string, address string, ethEndpoint string, listenAddr string) (pid int) {
 
-	log.Println(binarypath, keystorePath, passwordFile, address, ethEndpoint, listenAddr)
+	log.Println(binarypath, version, keystorePath, passwordFile, address, ethEndpoint, listenAddr)
 	log.Printf("Starting Raiden Binary for Address: %v and endpoint: %v on listen Address: %v", address, ethEndpoint, listenAddr)
 
 	exists, err := os.Stat(binarypath)

@@ -63,6 +63,26 @@ func checkChannelID(receiver string) (id int64, err error) {
 	return
 }
 
+//sendPayment sends amount to receiver
+func sendPayment(receiver string, amount int64) (err error) {
+	statuscode, body, err := raidenlib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
+	if err != nil {
+		return err
+	}
+	if statuscode == http.StatusPaymentRequired {
+		var jsonr map[string]interface{}
+		err = json.Unmarshal([]byte(body), &jsonr)
+		if err != nil {
+			return err
+		}
+		//TODO: Test Missing Channel Funds
+		log.Println(body)
+		//log.Printf("Channel Balance of ID %v insufficient (is: %v, need: %v), refunding..", channels[receiver], jsonr["balance"], amount)
+		err = raiseChannelFunds(receiver, deposit)
+	}
+	return
+}
+
 //startPayments starts a go routine which sends every interval the amount to receiver
 func startPayments(receiver string, amount int64) (err error) {
 	go func() (err error) {
@@ -81,21 +101,7 @@ func startPayments(receiver string, amount int64) (err error) {
 			select {
 			case t := <-ticker.C:
 				log.Printf("Sending Payment to %s at: %s", receiver, t.Format("2006-01-02 15:04:05 +0800"))
-				statuscode, body, err := raidenlib.SendRequest("POST", raidenEndpoint+path.Join("payments", tokenAddress, receiver), fmt.Sprintf(`{"amount": %v}`, amount), "application/json")
-				if err != nil {
-					return err
-				}
-				if statuscode == http.StatusPaymentRequired {
-					var jsonr map[string]interface{}
-					err = json.Unmarshal([]byte(body), &jsonr)
-					if err != nil {
-						return err
-					}
-					//TODO: Test Missing Channel Funds
-					log.Println(body)
-					//log.Printf("Channel Balance of ID %v insufficient (is: %v, need: %v), refunding..", channels[receiver], jsonr["balance"], amount)
-					err = raiseChannelFunds(receiver, deposit)
-				}
+				err = sendPayment(receiver, amount)
 			case <-quit:
 				log.Printf("Stopped Payments to %s", receiver)
 				ticker.Stop()
