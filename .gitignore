@@ -1,0 +1,9 @@
+# Jetbrains
+.idea/
+
+# Mac OS X
+.DS_Store
+
+# Visual Studio Code
+/.vscode
+debug
