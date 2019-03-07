@@ -395,7 +395,7 @@ func setupWebserver(addr string) {
 func main() {
 	tm := flag.Int("interval", 2000, "Interval for sending payments (microseconds)")
 	pm := flag.Int64("paymentvalue", 1337, "Amount to be sent per each payment")
-	ver := flag.String("version", "v0.100.0", "Raiden Binary Version")
+	ver := flag.String("version", "v0.100.2", "Raiden Binary Version")
 	flag.Parse()
 	payAmount = *pm
 	version = *ver

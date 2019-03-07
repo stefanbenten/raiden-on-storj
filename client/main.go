@@ -190,7 +190,7 @@ func main() {
 	ethnode := flag.String("ethnode", "http://home.stefan-benten.de:7701/", "Ethereum Node Endpoint")
 	listen := flag.String("listen", "0.0.0.0:7710", "Listen Address for Raiden Endpoint")
 	raiden := flag.String("listen-raiden", "0.0.0.0:7709", "Listen Address for Raiden Endpoint")
-	ver := flag.String("version", "v0.100.0", "Raiden Binary Version")
+	ver := flag.String("version", "v0.100.2", "Raiden Binary Version")
 	keystore := flag.String("keystore", "./keystore", "Keystore Path")
 	pw := flag.String("password", "superStr0ng", "Password used for Keystore encryption")
 	flag.Parse()
