@@ -18,20 +18,19 @@ import (
 	"github.com/stefanbenten/raiden-on-storj/raidenlib"
 )
 
-const raidenEndpoint = "http://0.0.0.0:7709/api/v1/"
-const tokenAddress = "0xd762baF19084256262b3f9164a9183009A9001da"
-const keystorePath = "./keystore"
-const password = "superStr0ng"
-const passwordFile = "password.txt"
-
 var (
 	accepting             = true
 	channels              = map[string]int64{}
 	closingchannels       = map[string]*chan struct{}{}
 	interval              = 2 * time.Second
+	raidenEndpoint        = "http://0.0.0.0:7709/api/v1/"
+	tokenAddress          = "0xd762baF19084256262b3f9164a9183009A9001da"
+	keystorePath          = "./keystore"
+	password              = "superStr0ng"
+	passwordFile          = "password.txt"
 	deposit         int64 = 5000000000
 	payAmount       int64 = 1337
-	version               = "v0.100.0"
+	version               = "v0.100.2"
 	lock            *sync.Mutex
 )
 
