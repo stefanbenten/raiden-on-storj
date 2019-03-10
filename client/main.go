@@ -184,7 +184,8 @@ func debugHandler() {
 func main() {
 	go debugHandler()
 
-	skip := flag.Bool("direct", false, "Direct Payment Start with default Endpoints")
+	direct := flag.Bool("direct", false, "Direct Payment Start with default Endpoints")
+	skip := flag.Bool("skip", false, "Set to true if Raiden Binary is running already")
 	override := flag.Bool("override", false, "Delete existing KeyStore and generate a new one")
 	endpoint := flag.String("endpoint", "http://home.stefan-benten.de:7700/payments/", "Satellite Payment Endpoint")
 	ethnode := flag.String("ethnode", "http://home.stefan-benten.de:7701/", "Ethereum Node Endpoint")
@@ -209,16 +210,25 @@ func main() {
 		}
 	}
 
+	if *skip {
+		//set temporary RaidenPID for now
+		//ToDo: Fetch PID from system
+		raidenPID = -1
+	}
+
 	//Load Ethereum Address or generate a new one
 	prepareETHAddress()
 
 	//When using the direct flag start Raiden directly and request payments, else open an browser interface for interaction
-	if *skip {
+	if *direct {
 		//Start Raiden Binary
-		log.Println("Skip Flag set, starting Raiden Binary..")
-		raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", version, *keystore, *pw, ethAddress, *ethnode, *raiden)
+		log.Println("Direct Flag set, starting Raiden Binary...")
 		if raidenPID == 0 {
-			log.Fatalln("error: unable to start Raiden Binary")
+			raidenPID = raidenlib.StartRaidenBinary("./raiden-binary", version, *keystore, *pw, ethAddress, *ethnode, *raiden)
+			if raidenPID == 0 {
+				log.Fatalln("error: unable to start Raiden Binary")
+				return
+			}
 		}
 		_, _, err := raidenlib.SendRequest("GET", *endpoint+path.Join("start", ethAddress), "", "application/json")
 		if err != nil {
